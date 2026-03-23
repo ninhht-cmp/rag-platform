@@ -1,0 +1,117 @@
+"""
+app/api/v1/endpoints/analytics.py
+───────────────────────────────────
+Admin analytics endpoints:
+- GET /admin/stats          — query stats per use case
+- GET /admin/eval/{uc_id}   — latest eval results
+- POST /admin/eval/{uc_id}  — trigger evaluation run
+"""
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.api.v1.middleware.auth import require_roles
+from app.core.logging import get_logger
+from app.core.plugin_registry import registry
+from app.models.domain import EvalMetrics, Role
+from app.services.evaluation.eval_service import EvalSample, get_eval_service
+
+logger = get_logger(__name__)
+router = APIRouter(prefix="/admin", tags=["Admin"])
+
+_admin_required = require_roles(Role.ADMIN)
+
+
+@router.get("/stats", summary="Query statistics per use case")
+async def get_stats(
+    use_case_id: str | None = None,
+    days: int = 7,
+    _: object = Depends(_admin_required),
+) -> dict:
+    """
+    Returns query volume, avg confidence, escalation rate,
+    and token usage per use case for the last N days.
+    Requires: admin role.
+    Note: Returns mock data when DB unavailable.
+    """
+    # Mock response — replace with real DB query via QueryLogRepository
+    active_plugins = registry.get_active()
+    stats = []
+    for p in active_plugins:
+        if use_case_id and p.id != use_case_id:
+            continue
+        stats.append({
+            "use_case_id": p.id,
+            "name": p.name,
+            "total_queries": 0,
+            "avg_confidence": 0.0,
+            "avg_latency_ms": 0,
+            "escalated_count": 0,
+            "total_input_tokens": 0,
+            "total_output_tokens": 0,
+            "note": "Connect QueryLogRepository to get real stats",
+        })
+
+    return {
+        "period_days": days,
+        "use_cases": stats,
+    }
+
+
+@router.get(
+    "/eval/{use_case_id}",
+    response_model=EvalMetrics | None,
+    summary="Latest evaluation results for a use case",
+)
+async def get_eval_results(
+    use_case_id: str,
+    _: object = Depends(_admin_required),
+) -> EvalMetrics | None:
+    """Returns the most recent Ragas evaluation run for a use case."""
+    if registry.get(use_case_id) is None:
+        raise HTTPException(status_code=404, detail=f"Use case '{use_case_id}' not found")
+    # Replace with real EvalRepository.latest() call
+    return None
+
+
+@router.post(
+    "/eval/{use_case_id}",
+    response_model=EvalMetrics,
+    summary="Trigger evaluation run",
+)
+async def trigger_eval(
+    use_case_id: str,
+    _: object = Depends(_admin_required),
+) -> EvalMetrics:
+    """
+    Manually trigger a Ragas evaluation on built-in sample data.
+    In production: load test dataset from S3 or DB.
+    """
+    if registry.get(use_case_id) is None:
+        raise HTTPException(status_code=404, detail=f"Use case '{use_case_id}' not found")
+
+    # Built-in sample dataset for smoke testing
+    samples = [
+        EvalSample(
+            question="What is the main purpose of this system?",
+            ground_truth="This is a RAG platform for enterprise AI use cases.",
+            contexts=["The RAG Platform enables companies to build AI applications on their own data."],
+            answer="The system is an enterprise RAG platform for building AI applications.",
+        ),
+        EvalSample(
+            question="How many use cases are supported?",
+            ground_truth="Four use cases: knowledge base, support, document Q&A, and sales.",
+            contexts=["The platform supports four use cases: Internal KB, Customer Support, Document Q&A, Sales Automation."],
+            answer="The platform supports four use cases.",
+        ),
+    ]
+
+    svc = get_eval_service()
+    result = await svc.evaluate_plugin(use_case_id, samples)
+    logger.info(
+        "eval.triggered",
+        use_case=use_case_id,
+        passed=result.passed,
+        faithfulness=result.faithfulness,
+    )
+    return result

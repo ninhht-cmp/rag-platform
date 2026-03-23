@@ -1,0 +1,197 @@
+# infrastructure/k8s/deployment.yaml
+# Kubernetes manifests for production deployment.
+# Apply with: kubectl apply -f infrastructure/k8s/
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rag-platform
+
+---
+# ── ConfigMap (non-secret config) ──────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rag-platform-config
+  namespace: rag-platform
+data:
+  ENVIRONMENT: "production"
+  APP_NAME: "RAG Platform"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  LLM_PROVIDER: "anthropic"
+  LLM_MODEL_PRIMARY: "claude-sonnet-4-6"
+  LLM_MODEL_SECONDARY: "claude-haiku-4-5-20251001"
+  EMBEDDING_MODEL: "BAAI/bge-m3"
+  EMBEDDING_DIMENSION: "1024"
+  EMBEDDING_DEVICE: "cpu"
+  RAG_CHUNK_SIZE: "512"
+  RAG_CHUNK_OVERLAP: "64"
+  RAG_TOP_K: "5"
+  RAG_RERANKER_ENABLED: "true"
+  FEATURE_STREAMING: "true"
+  FEATURE_SEMANTIC_CACHE: "true"
+  FEATURE_CITATION: "true"
+  QDRANT_URL: "http://qdrant-service:6333"
+  REDIS_URL: "redis://redis-service:6379/0"
+
+---
+# ── Secret (sensitive values — use Vault or sealed-secrets in prod) ──
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rag-platform-secrets
+  namespace: rag-platform
+type: Opaque
+stringData:
+  SECRET_KEY: "REPLACE_WITH_REAL_32_CHAR_SECRET"
+  ANTHROPIC_API_KEY: "REPLACE_WITH_REAL_KEY"
+  DATABASE_URL: "postgresql+asyncpg://rag:REPLACE_PASS@postgres-service:5432/rag_platform"
+
+---
+# ── API Deployment ──────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-api
+  namespace: rag-platform
+  labels:
+    app: rag-api
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rag-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0          # zero-downtime deployments
+  template:
+    metadata:
+      labels:
+        app: rag-api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: api
+          image: ghcr.io/your-org/rag-platform:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: rag-platform-config
+            - secretRef:
+                name: rag-platform-secrets
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+
+---
+# ── Service ─────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-api-service
+  namespace: rag-platform
+spec:
+  selector:
+    app: rag-api
+  ports:
+    - port: 80
+      targetPort: 8000
+      name: http
+  type: ClusterIP
+
+---
+# ── HorizontalPodAutoscaler ──────────────────────────────────────
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rag-api-hpa
+  namespace: rag-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rag-api
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+# ── Ingress ─────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rag-ingress
+  namespace: rag-platform
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.rag-platform.yourdomain.com
+      secretName: rag-tls
+  rules:
+    - host: api.rag-platform.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rag-api-service
+                port:
+                  number: 80
