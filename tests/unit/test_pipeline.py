@@ -43,6 +43,7 @@ def sample_plugin() -> UseCasePlugin:
         system_prompt_path="knowledge_base_system.j2",
         retrieval=RetrievalConfig(top_k=3, score_threshold=0.5),
         rbac=RBACRule(allowed_roles=["*"]),
+        escalation_pattern=None,
     )
 
 
