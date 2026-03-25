@@ -1,20 +1,41 @@
 """
 app/api/v1/endpoints/health.py
 ───────────────────────────────
-Health check and admin endpoints.
-Used by load balancer, K8s liveness/readiness probes.
+Health check endpoints — liveness & readiness probes.
+
+FIXES applied:
+- [CONCERN] readiness() no longer creates a new SQLAlchemy engine per probe call.
+  K8s probes fire every few seconds; creating an engine each time leaks connections.
+  Now uses a module-level reusable engine (lazy-initialized once).
 """
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 
 from app.api.v1.middleware.auth import require_roles
 from app.core.config import settings
+from app.core.logging import get_logger
 from app.core.plugin_registry import registry
 from app.models.domain import HealthStatus, Role
 from app.services.rag.vector_store import get_vector_store
 
+logger = get_logger(__name__)
 router = APIRouter(tags=["Health"])
+
+_health_engine = None
+
+
+def _get_health_engine():
+    global _health_engine
+    if _health_engine is None:
+        _health_engine = create_async_engine(
+            str(settings.DATABASE_URL),
+            pool_size=1,
+            max_overflow=0,
+            pool_pre_ping=True,
+        )
+    return _health_engine
 
 
 @router.get("/health", response_model=HealthStatus, summary="Health check")
@@ -47,7 +68,7 @@ async def readiness() -> HealthStatus:
         if not ok:
             overall = "degraded"
     except Exception as exc:
-        components["qdrant"] = f"error: {exc}"
+        components["qdrant"] = f"error: {type(exc).__name__}"
         overall = "unhealthy"
 
     # Check Redis
@@ -60,21 +81,17 @@ async def readiness() -> HealthStatus:
         components["redis"] = f"error: {type(exc).__name__}"
         overall = "degraded"
 
-    # Check PostgreSQL (lightweight check — just attempt connection)
+    # Check PostgreSQL — reuse shared engine (no new engine per probe)
     try:
-        from sqlalchemy.ext.asyncio import create_async_engine
-        from app.core.config import settings
-        engine = create_async_engine(str(settings.DATABASE_URL), pool_pre_ping=True)
-        async with engine.connect():
-            components["postgres"] = "healthy"
-        await engine.dispose()
+        engine = _get_health_engine()
+        async with engine.connect() as conn:
+            await conn.execute(__import__("sqlalchemy", fromlist=["text"]).text("SELECT 1"))
+        components["postgres"] = "healthy"
     except Exception as exc:
         components["postgres"] = f"unavailable: {type(exc).__name__}"
-        # Postgres down is degraded, not unhealthy (app still works without audit log)
         if overall == "healthy":
             overall = "degraded"
 
-    # Check plugin registry
     active = len(registry.get_active())
     components["plugins"] = f"{active} active"
 

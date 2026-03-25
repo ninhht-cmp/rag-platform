@@ -58,7 +58,7 @@ def register_all_plugins() -> None:
         ),
         monthly_token_budget=5_000_000,
         citation_required=True,
-        escalation_pattern=r"termination|resignation|legal action|lawsuit",
+        escalation_pattern=r"(?i).*(termination|resignation|legal action|lawsuit|legal advice|tư vấn pháp lý|sue|attorney).*",
     ))
 
     # ──────────────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ def register_all_plugins() -> None:
         ),
         monthly_token_budget=3_000_000,
         citation_required=True,
-        escalation_pattern=r"legal advice|tư vấn pháp lý|sign|ký kết",
+        escalation_pattern=r"(?i).*(lawsuit|legal action|legal advice|tư vấn pháp lý|sue|attorney|lawyer|complaint|sign|ký kết).*",
     ))
 
     # ──────────────────────────────────────────────────────────────

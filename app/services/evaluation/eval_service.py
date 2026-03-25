@@ -2,17 +2,6 @@
 app/services/evaluation/eval_service.py
 ────────────────────────────────────────
 Ragas evaluation pipeline.
-
-Runs quality checks on a sample of real queries per use case.
-Called by:
-- CI/CD pipeline (gate before deploy)
-- Weekly cron job (drift detection)
-- Manual trigger via admin API
-
-Metrics:
-- Faithfulness: Does the answer stick to retrieved context?
-- Answer Relevancy: Does the answer actually address the question?
-- Context Recall: Did retrieval find the right documents?
 """
 from __future__ import annotations
 
@@ -31,35 +20,24 @@ logger = get_logger(__name__)
 @dataclass
 class EvalSample:
     question: str
-    ground_truth: str      # expected answer (from eval dataset)
-    contexts: list[str]    # retrieved chunks
-    answer: str            # LLM-generated answer
+    ground_truth: str
+    contexts: list[str]
+    answer: str
 
 
 class EvaluationService:
-    """
-    Runs Ragas evaluation on a test dataset.
-    Falls back to mock scores if Ragas not available (CI safety net).
-    """
-
     async def evaluate_plugin(
         self,
         use_case_id: str,
         samples: list[EvalSample],
     ) -> EvalMetrics:
-        """Run evaluation on provided samples. Returns aggregated metrics."""
         plugin = registry.get(use_case_id)
         if plugin is None:
             raise ValueError(f"Unknown use_case_id: {use_case_id}")
-
         if not samples:
             raise ValueError("No samples provided for evaluation")
 
-        logger.info(
-            "eval.start",
-            use_case=use_case_id,
-            sample_count=len(samples),
-        )
+        logger.info("eval.start", use_case=use_case_id, sample_count=len(samples))
 
         try:
             metrics = await self._run_ragas(samples)
@@ -94,7 +72,6 @@ class EvaluationService:
         return result
 
     async def _run_ragas(self, samples: list[EvalSample]) -> dict[str, float]:
-        """Run actual Ragas evaluation."""
         from datasets import Dataset                          # type: ignore[import]
         from ragas import evaluate                            # type: ignore[import]
         from ragas.metrics import (                          # type: ignore[import]
@@ -111,7 +88,7 @@ class EvaluationService:
         }
         dataset = Dataset.from_dict(data)
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             None,
             lambda: evaluate(
@@ -126,10 +103,6 @@ class EvaluationService:
         }
 
     async def _mock_eval(self, samples: list[EvalSample]) -> dict[str, float]:
-        """
-        Mock evaluation for CI when Ragas is not installed.
-        Scores based on simple heuristics — not for production use.
-        """
         import re
 
         def overlap_score(answer: str, context: str) -> float:
@@ -156,7 +129,6 @@ class EvaluationService:
         }
 
     def format_report(self, metrics: EvalMetrics) -> str:
-        """Human-readable evaluation report."""
         status = "✓ PASSED" if metrics.passed else "✗ FAILED"
         plugin = registry.get(metrics.use_case_id)
         thresholds = plugin.eval_thresholds if plugin else None
@@ -170,12 +142,9 @@ class EvaluationService:
             "Metrics:",
         ]
         for name, val, threshold in [
-            ("Faithfulness", metrics.faithfulness,
-             thresholds.faithfulness if thresholds else 0),
-            ("Answer Relevancy", metrics.answer_relevancy,
-             thresholds.answer_relevancy if thresholds else 0),
-            ("Context Recall", metrics.context_recall,
-             thresholds.context_recall if thresholds else 0),
+            ("Faithfulness", metrics.faithfulness, thresholds.faithfulness if thresholds else 0),
+            ("Answer Relevancy", metrics.answer_relevancy, thresholds.answer_relevancy if thresholds else 0),
+            ("Context Recall", metrics.context_recall, thresholds.context_recall if thresholds else 0),
         ]:
             flag = "✓" if val >= threshold else "✗"
             lines.append(f"  {flag} {name}: {val:.3f} (threshold: {threshold:.2f})")

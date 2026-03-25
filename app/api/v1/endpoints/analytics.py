@@ -1,10 +1,7 @@
 """
 app/api/v1/endpoints/analytics.py
 ───────────────────────────────────
-Admin analytics endpoints:
-- GET /admin/stats          — query stats per use case
-- GET /admin/eval/{uc_id}   — latest eval results
-- POST /admin/eval/{uc_id}  — trigger evaluation run
+Admin analytics endpoints.
 """
 from __future__ import annotations
 
@@ -29,33 +26,34 @@ async def get_stats(
     _: object = Depends(_admin_required),
 ) -> dict:
     """
-    Returns query volume, avg confidence, escalation rate,
-    and token usage per use case for the last N days.
-    Requires: admin role.
-    Note: Returns mock data when DB unavailable.
+    Returns query volume, avg confidence, escalation rate, and token usage per use case.
+    Queries real DB; falls back to empty stats if DB is unavailable.
     """
-    # Mock response — replace with real DB query via QueryLogRepository
-    active_plugins = registry.get_active()
-    stats = []
-    for p in active_plugins:
-        if use_case_id and p.id != use_case_id:
-            continue
-        stats.append({
-            "use_case_id": p.id,
-            "name": p.name,
-            "total_queries": 0,
-            "avg_confidence": 0.0,
-            "avg_latency_ms": 0,
-            "escalated_count": 0,
-            "total_input_tokens": 0,
-            "total_output_tokens": 0,
-            "note": "Connect QueryLogRepository to get real stats",
-        })
-
-    return {
-        "period_days": days,
-        "use_cases": stats,
-    }
+    try:
+        from app.repositories.document_repository import get_session_factory, QueryLogRepository
+        async with get_session_factory()() as session:
+            repo = QueryLogRepository(session)
+            return await repo.get_stats(use_case_id=use_case_id, days=days)
+    except Exception as exc:
+        logger.warning("analytics.stats.db_unavailable", error=str(exc))
+        # Graceful degradation: return empty stats with a note
+        active_plugins = registry.get_active()
+        stats = []
+        for p in active_plugins:
+            if use_case_id and p.id != use_case_id:
+                continue
+            stats.append({
+                "use_case_id": p.id,
+                "name": p.name,
+                "total_queries": 0,
+                "avg_confidence": 0.0,
+                "avg_latency_ms": 0,
+                "escalated_count": 0,
+                "total_input_tokens": 0,
+                "total_output_tokens": 0,
+                "note": "DB unavailable — showing empty stats",
+            })
+        return {"period_days": days, "use_cases": stats}
 
 
 @router.get(
@@ -67,11 +65,17 @@ async def get_eval_results(
     use_case_id: str,
     _: object = Depends(_admin_required),
 ) -> EvalMetrics | None:
-    """Returns the most recent Ragas evaluation run for a use case."""
     if registry.get(use_case_id) is None:
         raise HTTPException(status_code=404, detail=f"Use case '{use_case_id}' not found")
-    # Replace with real EvalRepository.latest() call
-    return None
+
+    try:
+        from app.repositories.document_repository import get_session_factory, EvalRepository
+        async with get_session_factory()() as session:
+            repo = EvalRepository(session)
+            return await repo.latest(use_case_id)
+    except Exception as exc:
+        logger.warning("analytics.eval.db_unavailable", error=str(exc))
+        return None
 
 
 @router.post(
@@ -83,14 +87,9 @@ async def trigger_eval(
     use_case_id: str,
     _: object = Depends(_admin_required),
 ) -> EvalMetrics:
-    """
-    Manually trigger a Ragas evaluation on built-in sample data.
-    In production: load test dataset from S3 or DB.
-    """
     if registry.get(use_case_id) is None:
         raise HTTPException(status_code=404, detail=f"Use case '{use_case_id}' not found")
 
-    # Built-in sample dataset for smoke testing
     samples = [
         EvalSample(
             question="What is the main purpose of this system?",
@@ -108,6 +107,16 @@ async def trigger_eval(
 
     svc = get_eval_service()
     result = await svc.evaluate_plugin(use_case_id, samples)
+
+    # Persist result
+    try:
+        from app.repositories.document_repository import get_session_factory, EvalRepository
+        async with get_session_factory()() as session:
+            repo = EvalRepository(session)
+            await repo.save_result(result)
+    except Exception as exc:
+        logger.warning("analytics.eval.persist_failed", error=str(exc))
+
     logger.info(
         "eval.triggered",
         use_case=use_case_id,

@@ -3,12 +3,6 @@ app/services/ingestion/ingestion_service.py
 ────────────────────────────────────────────
 Document ingestion pipeline:
 PDF / DOCX / TXT / HTML → clean text → chunks → embeddings → Qdrant
-
-Design:
-- Async throughout (no blocking IO)
-- Chunk strategy per document type
-- PII detection placeholder (extend with presidio)
-- Progress tracking via metadata
 """
 from __future__ import annotations
 
@@ -31,20 +25,56 @@ from app.services.rag.vector_store import get_vector_store
 logger = get_logger(__name__)
 
 
+# ── Content-type validation with magic bytes ──────────────────────
+
+# Mapping: detected MIME → canonical MIME we store
+_ALLOWED_MIME_TYPES: dict[str, str] = {
+    "application/pdf": "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain": "text/plain",
+    "text/html": "text/html",
+    "text/markdown": "text/markdown",
+    "text/x-markdown": "text/markdown",   # libmagic sometimes returns this
+}
+
+
+def _validate_content_type(content: bytes, claimed_type: str) -> str:
+    """
+    FIX: Validate actual file content against magic bytes.
+    Returns the canonical MIME type, raises ValueError if not allowed.
+    Falls back to claimed type if python-magic is not installed (degraded mode).
+    """
+    try:
+        import magic  # type: ignore[import]
+        detected = magic.from_buffer(content[:4096], mime=True)
+        canonical = _ALLOWED_MIME_TYPES.get(detected)
+        if canonical is None:
+            raise ValueError(
+                f"File content does not match an allowed type. "
+                f"Detected: {detected}, claimed: {claimed_type}"
+            )
+        return canonical
+    except ImportError:
+        # python-magic not installed — fall back to HTTP header (with warning)
+        logger.warning(
+            "content_type_validation.magic_unavailable",
+            note="Install python-magic for proper file validation",
+        )
+        if claimed_type not in _ALLOWED_MIME_TYPES:
+            raise ValueError(f"Unsupported content type: {claimed_type}")
+        return _ALLOWED_MIME_TYPES[claimed_type]
+
+
 # ── Text extractors ───────────────────────────────────────────────
 
 async def _extract_pdf(content: bytes) -> str:
-    """Extract text from PDF using pypdf."""
     import asyncio
     from pypdf import PdfReader
 
     def _extract() -> str:
         reader = PdfReader(io.BytesIO(content))
-        pages: list[str] = []
-        for page in reader.pages:
-            text = page.extract_text() or ""
-            pages.append(text)
-        return "\n\n".join(pages)
+        return "\n\n".join(page.extract_text() or "" for page in reader.pages)
 
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _extract)
@@ -84,10 +114,6 @@ def chunk_text(
     document_id: str,
     metadata: dict[str, Any],
 ) -> list[DocumentChunk]:
-    """
-    Recursive character text splitter.
-    Tries to split on paragraph → sentence → word boundaries.
-    """
     from langchain_text_splitters import RecursiveCharacterTextSplitter
 
     splitter = RecursiveCharacterTextSplitter(
@@ -113,39 +139,24 @@ def chunk_text(
     return chunks
 
 
-# ── PII Redactor (stub — extend with presidio) ────────────────────
+# ── PII Redactor ──────────────────────────────────────────────────
 
 def redact_pii(text: str, pii_fields: list[str]) -> str:
-    """
-    Basic PII redaction. In production, replace with:
-    from presidio_analyzer import AnalyzerEngine
-    from presidio_anonymizer import AnonymizerEngine
-    """
     import re
     if not pii_fields:
         return text
-
-    # Email
     if "email" in pii_fields:
         text = re.sub(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "[EMAIL]", text)
-    # Phone (Vietnamese + international)
     if "phone" in pii_fields:
         text = re.sub(r"\b(?:\+84|0)[0-9]{9,10}\b", "[PHONE]", text)
-    # CCCD/CMND
     if "id_number" in pii_fields:
         text = re.sub(r"\b\d{9,12}\b", "[ID_NUMBER]", text)
-
     return text
 
 
 # ── Main Ingestion Service ────────────────────────────────────────
 
 class IngestionService:
-    """
-    Ingest a document into the vector store.
-    Called by API endpoint and background workers.
-    """
-
     def __init__(self) -> None:
         self._embedding = get_embedding_service()
         self._vector_store = get_vector_store()
@@ -158,14 +169,6 @@ class IngestionService:
         chunk_size_override: int | None = None,
         chunk_overlap_override: int | None = None,
     ) -> IngestionResult:
-        """
-        Full ingestion flow:
-        1. Extract text from document
-        2. Redact PII
-        3. Chunk
-        4. Embed
-        5. Upsert to Qdrant
-        """
         start_ms = int(time.monotonic() * 1000)
 
         plugin = registry.get(use_case_id)
@@ -179,29 +182,28 @@ class IngestionService:
             )
 
         try:
-            # 1. Extract
-            extractor = EXTRACTORS.get(document.content_type)
+            canonical_type = _validate_content_type(content, document.content_type)
+            document.content_type = canonical_type
+
+            extractor = EXTRACTORS.get(canonical_type)
             if extractor is None:
-                raise ValueError(f"Unsupported content type: {document.content_type}")
+                raise ValueError(f"Unsupported content type: {canonical_type}")
 
             raw_text = await extractor(content)
             if not raw_text.strip():
                 raise ValueError("Document produced empty text after extraction")
 
-
             logger.info(
                 "ingestion.extracted",
                 doc_id=document.id,
                 chars=len(raw_text),
-                content_type=document.content_type,
+                content_type=canonical_type,
             )
 
-            # 2. PII redaction
-            pii_fields = plugin.rbac.metadata_filters.get("pii_fields", "")
-            pii_list = [f.strip() for f in pii_fields.split(",")] if pii_fields else []
+            pii_fields_raw = plugin.rbac.metadata_filters.get("pii_fields", "")
+            pii_list = [f.strip() for f in pii_fields_raw.split(",")] if pii_fields_raw else []
             clean_text = redact_pii(raw_text, pii_list)
 
-            # 3. Chunk
             cfg = plugin.retrieval
             chunk_size = chunk_size_override or cfg.chunk_size
             chunk_overlap = chunk_overlap_override or cfg.chunk_overlap
@@ -227,30 +229,21 @@ class IngestionService:
                 chunk_size=chunk_size,
             )
 
-            # 4. Embed
             texts = [c.content for c in chunks]
             embeddings = await self._embedding.embed_texts(texts)
             for chunk, emb in zip(chunks, embeddings):
                 chunk.embedding = emb
 
-            # 5. Upsert (delete existing chunks first to avoid duplicates on re-ingest)
             await self._vector_store.ensure_collection(plugin.collection_name)
             try:
-                await self._vector_store.delete_by_document(
-                    plugin.collection_name, document.id
-                )
+                await self._vector_store.delete_by_document(plugin.collection_name, document.id)
             except Exception:
-                pass  # Collection may be empty on first ingest
+                pass
+
             count = await self._vector_store.upsert_chunks(plugin.collection_name, chunks)
-
             elapsed = int(time.monotonic() * 1000) - start_ms
-            logger.info(
-                "ingestion.complete",
-                doc_id=document.id,
-                chunks=count,
-                elapsed_ms=elapsed,
-            )
 
+            logger.info("ingestion.complete", doc_id=document.id, chunks=count, elapsed_ms=elapsed)
             return IngestionResult(
                 document_id=document.id,
                 chunks_created=count,
@@ -269,16 +262,10 @@ class IngestionService:
                 error_message=str(exc),
             )
 
-    async def delete_document(
-        self,
-        document_id: str,
-        use_case_id: str,
-    ) -> None:
-        """Remove all chunks for a document from vector store."""
+    async def delete_document(self, document_id: str, use_case_id: str) -> None:
         plugin = registry.get(use_case_id)
         if plugin is None:
             raise ValueError(f"Unknown use_case_id: {use_case_id}")
-
         await self._vector_store.delete_by_document(
             collection_name=plugin.collection_name,
             document_id=document_id,
@@ -286,5 +273,11 @@ class IngestionService:
         logger.info("ingestion.deleted", doc_id=document_id, use_case=use_case_id)
 
 
+_ingestion_service: IngestionService | None = None
+
+
 def get_ingestion_service() -> IngestionService:
-    return IngestionService()
+    global _ingestion_service
+    if _ingestion_service is None:
+        _ingestion_service = IngestionService()
+    return _ingestion_service

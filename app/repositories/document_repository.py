@@ -2,17 +2,14 @@
 app/repositories/document_repository.py
 ─────────────────────────────────────────
 PostgreSQL repository for document metadata and query audit logs.
-Uses raw asyncpg for performance — no ORM overhead on hot paths.
-Pattern: Repository + Unit of Work (manual transactions).
 """
 from __future__ import annotations
 
 from datetime import datetime, timedelta
 from typing import Any
-from uuid import UUID
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
 from app.core.logging import get_logger
@@ -20,25 +17,37 @@ from app.models.domain import Document, DocumentStatus, EvalMetrics, QueryRespon
 
 logger = get_logger(__name__)
 
-# ── Async engine (singleton) ──────────────────────────────────────
-_engine = create_async_engine(
-    str(settings.DATABASE_URL),
-    pool_size=settings.DATABASE_POOL_SIZE,
-    max_overflow=settings.DATABASE_MAX_OVERFLOW,
-    pool_pre_ping=True,
-    echo=settings.DEBUG,
-)
+_engine: AsyncEngine | None = None
+_session_factory: async_sessionmaker | None = None  # type: ignore[type-arg]
 
-AsyncSessionLocal = async_sessionmaker(
-    bind=_engine,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False,
-)
+
+def get_engine() -> AsyncEngine:
+    global _engine
+    if _engine is None:
+        _engine = create_async_engine(
+            str(settings.DATABASE_URL),
+            pool_size=settings.DATABASE_POOL_SIZE,
+            max_overflow=settings.DATABASE_MAX_OVERFLOW,
+            pool_pre_ping=True,
+            echo=settings.DEBUG,
+        )
+    return _engine
+
+
+def get_session_factory() -> async_sessionmaker:  # type: ignore[type-arg]
+    global _session_factory
+    if _session_factory is None:
+        _session_factory = async_sessionmaker(
+            bind=get_engine(),
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False,
+        )
+    return _session_factory
 
 
 async def get_db_session() -> AsyncSession:
-    async with AsyncSessionLocal() as session:
+    async with get_session_factory()() as session:
         yield session  # type: ignore[misc]
 
 
@@ -58,9 +67,9 @@ class DocumentRepository:
                     (:id, :use_case_id, :user_id, :filename, :content_type,
                      :size_bytes, :status, :chunk_count, :metadata::jsonb, :created_at)
                 ON CONFLICT (id) DO UPDATE SET
-                    status      = EXCLUDED.status,
-                    chunk_count = EXCLUDED.chunk_count,
-                    indexed_at  = EXCLUDED.indexed_at,
+                    status        = EXCLUDED.status,
+                    chunk_count   = EXCLUDED.chunk_count,
+                    indexed_at    = EXCLUDED.indexed_at,
                     error_message = EXCLUDED.error_message
             """),
             {
@@ -89,9 +98,9 @@ class DocumentRepository:
         await self._s.execute(
             text("""
                 UPDATE documents
-                SET status = :status,
-                    chunk_count = :chunk_count,
-                    indexed_at = CASE WHEN :status = 'indexed' THEN NOW() ELSE indexed_at END,
+                SET status        = :status,
+                    chunk_count   = :chunk_count,
+                    indexed_at    = CASE WHEN :status = 'indexed' THEN NOW() ELSE indexed_at END,
                     error_message = :error_message
                 WHERE id = :id
             """),
@@ -136,16 +145,15 @@ class QueryLogRepository:
         self._s = session
 
     async def log(self, response: QueryResponse, user_id: str) -> None:
-        """Persist every query for audit and analytics."""
         import orjson
         await self._s.execute(
             text("""
                 INSERT INTO query_logs
                     (user_id, use_case_id, query, answer, confidence,
-                     escalated, latency_ms, token_usage, session_id, created_at)
+                    escalated, latency_ms, token_usage, session_id, created_at)
                 VALUES
                     (:user_id, :use_case_id, :query, :answer, :confidence,
-                     :escalated, :latency_ms, :token_usage::jsonb, :session_id, NOW())
+                    :escalated, :latency_ms, CAST(:token_usage AS jsonb), :session_id, NOW())
             """),
             {
                 "user_id": user_id,
@@ -225,7 +233,6 @@ class TokenUsageRepository:
         await self._s.commit()
 
     async def daily_cost(self, use_case_id: str) -> float:
-        """Total cost today for a use case — used for budget guard."""
         result = await self._s.execute(
             text("""
                 SELECT COALESCE(SUM(cost_usd), 0.0) AS total

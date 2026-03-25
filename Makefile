@@ -176,3 +176,25 @@ clean-venv: ## Remove virtual environment (rebuild with: make setup)
 
 build: ## Build Docker image for production
 	docker build -f docker/Dockerfile -t rag-platform:latest .
+
+# ── Utility targets ─────────────────────────────────────────────────
+get-tokens: ## Get and export access and refresh tokens
+	@RESPONSE=$$(curl -s -X POST http://localhost:8000/api/v1/auth/token \
+		-d "username=admin@company.com&password=admin123"); \
+	echo "$$RESPONSE" | python3 -m json.tool; \
+	export TOKEN=$$(echo $$RESPONSE | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])"); \
+	export REFRESH_TOKEN=$$(echo $$RESPONSE | python3 -c "import sys,json; print(json.load(sys.stdin)['refresh_token'])"); \
+	echo ""; \
+	echo "To use them, run:"; \
+	echo "export TOKEN=$$TOKEN"; \
+	echo "export REFRESH_TOKEN=$$REFRESH_TOKEN"
+
+refresh: ## Refresh access token using refresh token
+	@if [ -z "$$REFRESH_TOKEN" ]; then \
+		echo "REFRESH_TOKEN not set. Run 'make get-tokens' first"; \
+		exit 1; \
+	fi
+	@curl -s -X POST http://localhost:8000/api/v1/auth/refresh \
+		-H "Content-Type: application/json" \
+		-d "{\"refresh_token\": \"$$REFRESH_TOKEN\"}" \
+		| python3 -m json.tool

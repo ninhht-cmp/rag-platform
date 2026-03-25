@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.v1.endpoints import analytics, auth, health, ingestion, query
 from app.api.v1.middleware.rate_limiter import RateLimiterMiddleware
-from app.core.config import settings
+from app.core.config import Environment, settings
 from app.core.logging import get_logger, setup_logging
 from app.plugins import register_all_plugins
 from app.services.rag.vector_store import get_vector_store
@@ -28,7 +28,7 @@ setup_logging()
 logger = get_logger(__name__)
 
 
-# ── Redis pool (shared across requests) ───────────────────────────
+# ── Redis pool ────────────────────────────────────────────────────
 _redis: aioredis.Redis | None = None  # type: ignore[type-arg]
 
 
@@ -38,13 +38,74 @@ def get_redis() -> aioredis.Redis:  # type: ignore[type-arg]
     return _redis
 
 
+# ── Budget checker (DB-backed) ─────────────────────────────────────
+async def _budget_checker(use_case_id: str) -> None:
+    """
+    FIX: Enforce daily LLM budget. Raises HTTP 429 when limit exceeded.
+    Called by LLMService.generate() before every LLM call.
+    """
+    from fastapi import HTTPException
+    from app.repositories.document_repository import get_session_factory
+    from app.repositories.document_repository import TokenUsageRepository
+
+    try:
+        async with get_session_factory()() as session:
+            repo = TokenUsageRepository(session)
+            today_cost = await repo.daily_cost(use_case_id)
+            if today_cost >= settings.LLM_DAILY_BUDGET_USD:
+                logger.warning(
+                    "budget.exceeded",
+                    use_case=use_case_id,
+                    today_cost=today_cost,
+                    limit=settings.LLM_DAILY_BUDGET_USD,
+                )
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        f"Daily LLM budget exceeded for use case '{use_case_id}'. "
+                        f"Spent: ${today_cost:.2f} / ${settings.LLM_DAILY_BUDGET_USD:.2f}. "
+                        "Budget resets at midnight UTC."
+                    ),
+                )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        # DB down → fail open (don't block all requests)
+        logger.error("budget.check.db_error", error=str(exc))
+
+
+# ── Query audit log callback ───────────────────────────────────────
+async def _query_log_callback(response: object, user_id: str) -> None:
+    """
+    FIX: Persist every query to query_logs table.
+    Called by RAGPipeline after each successful query.
+    """
+    from app.repositories.document_repository import get_session_factory
+    from app.repositories.document_repository import QueryLogRepository
+    from app.models.domain import QueryResponse
+
+    try:
+        async with get_session_factory()() as session:
+            repo = QueryLogRepository(session)
+            await repo.log(response, user_id)  # type: ignore[arg-type]
+    except Exception as exc:
+        logger.error("query_log.persist.failed", error=str(exc))
+
+
 # ── Lifespan ──────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     global _redis
     logger.info("app.startup", env=settings.ENVIRONMENT, version=settings.APP_VERSION)
 
-    # 1. Register all use-case plugins
+    # Validate CORS in production (same fail-fast philosophy as API key validation)
+    if settings.is_production and "*" in settings.ALLOWED_HOSTS:
+        raise RuntimeError(
+            "ALLOWED_HOSTS=[\"*\"] is not permitted in production. "
+            "Set ALLOWED_HOSTS to your actual domain(s)."
+        )
+
+    # 1. Register plugins
     register_all_plugins()
     logger.info("app.plugins.loaded", count=len(
         __import__("app.core.plugin_registry", fromlist=["registry"]).registry
@@ -64,7 +125,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await _redis.ping()
     logger.info("app.redis.connected")
 
-    yield  # ← application runs here
+    # 4. Wire budget guard into LLM service
+    from app.services.rag.llm_service import get_llm_service
+    get_llm_service().set_budget_checker(_budget_checker)
+    logger.info("app.budget_guard.wired", limit_usd=settings.LLM_DAILY_BUDGET_USD)
+
+    # 5. Wire query audit log into RAG pipeline
+    from app.api.v1.endpoints.query import get_pipeline
+    get_pipeline().set_query_log_callback(_query_log_callback)
+    logger.info("app.query_audit.wired")
+
+    yield
 
     # Graceful shutdown
     logger.info("app.shutdown")
@@ -85,7 +156,6 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # ── CORS ──────────────────────────────────────────────────────
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.ALLOWED_HOSTS,
@@ -94,12 +164,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # ── Rate limiter ──────────────────────────────────────────────
-    # redis_client=None → middleware fetches redis lazily via get_redis()
-    # per request, after startup. Fails open if Redis not yet ready.
     app.add_middleware(RateLimiterMiddleware, redis_client=None)
 
-    # ── Request ID + Timing middleware ────────────────────────────
     @app.middleware("http")
     async def request_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
         request_id = request.headers.get("X-Request-ID", str(uuid.uuid4())[:8])
@@ -118,7 +184,6 @@ def create_app() -> FastAPI:
         )
         return response
 
-    # ── Global exception handler ──────────────────────────────────
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         logger.error("unhandled_exception", path=request.url.path, error=str(exc), exc_info=True)
@@ -127,7 +192,6 @@ def create_app() -> FastAPI:
             content={"detail": "Internal server error", "type": type(exc).__name__},
         )
 
-    # ── Routers ───────────────────────────────────────────────────
     prefix = settings.API_PREFIX
     app.include_router(health.router)
     app.include_router(auth.router, prefix=prefix)
