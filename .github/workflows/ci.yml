@@ -35,7 +35,7 @@ jobs:
 
       - name: Type check (mypy)
         run: mypy app --ignore-missing-imports --no-strict-optional
-        continue-on-error: true   # informational for now
+        continue-on-error: true # informational for now
 
   # ── Unit tests ────────────────────────────────────────────────
   unit-tests:
@@ -56,7 +56,8 @@ jobs:
             langchain-text-splitters qdrant-client \
             redis python-jose passlib structlog orjson tenacity \
             jinja2 pypdf python-docx sqlalchemy asyncpg \
-            pytest pytest-asyncio pytest-cov httpx factory-boy
+            pytest pytest-asyncio pytest-cov httpx factory-boy \
+            python-multipart
 
       - name: Run unit tests
         run: pytest tests/unit/ -v --tb=short --cov=app --cov-report=xml
