@@ -100,7 +100,8 @@ jobs:
             langchain-text-splitters qdrant-client \
             redis python-jose passlib structlog orjson tenacity \
             jinja2 pypdf python-docx sqlalchemy asyncpg \
-            pytest pytest-asyncio httpx
+            pytest pytest-asyncio httpx \
+            python-multipart
 
       - name: Run integration tests
         run: pytest tests/integration/ tests/e2e/ -v --tb=short
@@ -127,7 +128,8 @@ jobs:
             langchain-text-splitters qdrant-client \
             redis python-jose passlib structlog orjson tenacity \
             jinja2 pypdf python-docx sqlalchemy asyncpg \
-            pytest pytest-asyncio httpx
+            pytest pytest-asyncio httpx \
+            python-multipart
 
       - name: Run E2E tests
         run: pytest tests/e2e/ -v --tb=short
@@ -164,6 +166,8 @@ jobs:
     environment: staging
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
 
       - name: Log in to registry
         uses: docker/login-action@v3
