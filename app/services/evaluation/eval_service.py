@@ -70,9 +70,9 @@ class EvaluationService:
         return result
 
     async def _run_ragas(self, samples: list[EvalSample]) -> dict[str, float]:
-        from datasets import Dataset                          # type: ignore[import]
-        from ragas import evaluate                            # type: ignore[import]
-        from ragas.metrics import (                          # type: ignore[import]
+        from datasets import Dataset  # type: ignore[import]
+        from ragas import evaluate  # type: ignore[import]
+        from ragas.metrics import (  # type: ignore[import]
             answer_relevancy,
             context_recall,
             faithfulness,

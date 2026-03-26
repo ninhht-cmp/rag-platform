@@ -292,7 +292,9 @@ class RAGPipeline:
             logger.warning("rag.pipeline.no_chunks", plugin=plugin.id)
 
             # Check escalation pattern even without chunks
-            escalated, escalation_reason = self._should_escalate(plugin, request.query, 0.0, has_chunks=False)
+            escalated, escalation_reason = self._should_escalate(
+                plugin, request.query, 0.0, has_chunks=False
+            )
 
             response = QueryResponse(
                 query=request.query,

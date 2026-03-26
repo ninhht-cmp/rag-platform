@@ -2,28 +2,35 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
 [project]
 name = "rag-platform"
 version = "1.0.0"
-description = "Enterprise AI RAG Platform — OpenRAG + RAGFlow + OpenClaw"
+description = "Enterprise AI RAG Platform"
 requires-python = ">=3.12"
 dependencies = [
     # Web framework
-    "fastapi==0.115.0",
-    "uvicorn[standard]==0.30.6",
-    "python-multipart==0.0.12",
+    "fastapi==0.115.14",
+    "uvicorn[standard]==0.34.3",
+    "python-multipart==0.0.22",
 
     # Validation & settings
+    # pydantic-settings>=2.10.1 required by langchain-community 0.4.x
     "pydantic==2.9.2",
-    "pydantic-settings==2.5.2",
+    "pydantic-settings==2.10.1",
 
     # LLM & RAG
-    "langchain==0.3.0",
-    "langchain-openai==0.2.0",
-    "langchain-anthropic==0.2.0",
-    "langchain-community==0.3.0",
-    "langgraph==0.2.28",
-    "langfuse==2.50.0",
+    # All langchain-* packages must be upgraded together — they share langchain-core.
+    # langchain 1.x is the current stable generation; do not mix with 0.3.x sub-packages.
+    "langchain==1.2.13",
+    "langchain-openai==1.1.12",
+    "langchain-anthropic==1.4.0",
+    "langchain-community==0.4.1",
+    "langchain-text-splitters==1.0.0",
+    "langgraph==1.1.3",
+    "langfuse==2.60.10",
 
     # Vector DB
     "qdrant-client==1.13.3",
@@ -49,8 +56,12 @@ dependencies = [
     "httpx==0.27.2",
 
     # Auth
+    # passlib is unmaintained (last release 2020). bcrypt must be pinned to 4.0.1
+    # because passlib's __version__ check breaks on bcrypt>=4.2.
+    # Track https://github.com/pypa/passlib/issues/190 for a maintained alternative.
     "python-jose[cryptography]==3.3.0",
     "passlib[bcrypt]==1.7.4",
+    "bcrypt==4.0.1",
 
     # Observability
     "structlog==24.4.0",
@@ -59,7 +70,9 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi==0.48b0",
 
     # Evaluation
-    "ragas==0.1.21",
+    # ragas 0.2+ requires langchain 1.x — compatible with our stack.
+    # API changed in 0.2: use ragas.metrics.* and ragas.evaluate() new signature.
+    "ragas==0.3.9",
 
     # Utilities
     "tenacity==9.0.0",

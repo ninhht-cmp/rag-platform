@@ -12,9 +12,8 @@ from uuid import uuid4
 import pytest
 
 from app.core.plugin_registry import (
-    EvalThresholds,
-    PluginStatus,
     PluginRegistry,
+    PluginStatus,
     RBACRule,
     RetrievalConfig,
     UseCasePlugin,
@@ -27,7 +26,6 @@ from app.models.domain import (
     User,
 )
 from app.services.rag.pipeline import RAGPipeline
-
 
 # ── Fixtures ──────────────────────────────────────────────────────
 
@@ -169,7 +167,10 @@ class TestRAGPipeline:
             mock_vs.return_value.search = AsyncMock(return_value=sample_chunks)
             mock_llm.return_value.render_prompt = MagicMock(return_value="system prompt")
             mock_llm.return_value.generate = AsyncMock(
-                return_value=("You can take 15 days vacation.", {"input_tokens": 100, "output_tokens": 50})
+                return_value=(
+                    "You can take 15 days vacation.",
+                    {"input_tokens": 100, "output_tokens": 50},
+                )
             )
             mock_reranker.rerank = AsyncMock(return_value=sample_chunks)
 

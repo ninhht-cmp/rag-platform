@@ -62,7 +62,9 @@ def _validate_content_type(content: bytes, claimed_type: str) -> str:
             note="Install python-magic for proper file validation",
         )
         if claimed_type not in _ALLOWED_MIME_TYPES:
-            raise ValueError(f"Unsupported content type: {claimed_type}")
+            raise ValueError(
+                f"Unsupported content type: {claimed_type}"
+            ) from None
         return _ALLOWED_MIME_TYPES[claimed_type]
 
 

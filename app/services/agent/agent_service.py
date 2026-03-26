@@ -10,18 +10,18 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import Any
+from typing import Annotated, Any
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
-from typing_extensions import Annotated, TypedDict
+from typing_extensions import TypedDict
 
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.plugin_registry import UseCasePlugin
-from app.models.domain import Citation, QueryRequest, QueryResponse, QueryStatus, User
+from app.models.domain import QueryRequest, QueryResponse, QueryStatus, User
 from app.services.agent.session_service import SessionService
 from app.services.agent.tools import get_tools_for_plugin
 
@@ -90,7 +90,10 @@ class AgentService:
                 return {
                     "messages": [
                         ToolMessage(
-                            content="Tool call limit reached. Providing best answer with available info.",
+                            content=(
+                                "Tool call limit reached. "
+                                "Providing best answer with available info."
+                            ),
                             tool_call_id="limit_reached",
                         )
                     ],
@@ -219,7 +222,11 @@ class AgentService:
                 final_message = msg
                 break
 
-        answer = str(final_message.content) if final_message else "I was unable to generate a response."
+        answer = (
+            str(final_message.content)
+            if final_message
+            else "I was unable to generate a response."
+        )
 
         # Persist to session if provided
         if request.session_id:

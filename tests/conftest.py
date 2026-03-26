@@ -7,6 +7,8 @@ Patches heavy dependencies at session level so tests stay fast.
 from __future__ import annotations
 
 import os
+import unittest.mock as mock
+
 import pytest
 
 # ── Force test environment before any app import ──────────────────
@@ -22,16 +24,15 @@ os.environ.setdefault(
 
 
 @pytest.fixture(scope="session", autouse=True)
-def register_plugins_once():
+def register_plugins_once() -> None:
     """Register all plugins once per test session. Idempotent."""
     from app.plugins import register_all_plugins
     register_all_plugins()
 
 
 @pytest.fixture(autouse=True)
-def mock_redis(monkeypatch: pytest.MonkeyPatch):
+def mock_redis(monkeypatch: pytest.MonkeyPatch) -> mock.AsyncMock:
     """Prevent real Redis connections in all tests."""
-    import unittest.mock as mock
     with mock.patch("redis.asyncio.from_url") as m:
         redis_mock = mock.AsyncMock()
         redis_mock.ping = mock.AsyncMock(return_value=True)
@@ -42,15 +43,16 @@ def mock_redis(monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.fixture(autouse=True)
-def mock_qdrant_startup(monkeypatch: pytest.MonkeyPatch):
+def mock_qdrant_startup(monkeypatch: pytest.MonkeyPatch) -> None:
     """Prevent real Qdrant connections during app startup."""
-    import unittest.mock as mock
     from app.services.rag import vector_store as vs_module
-    with mock.patch.object(vs_module.VectorStore, "startup", mock.AsyncMock()):
-        with mock.patch.object(vs_module.VectorStore, "shutdown", mock.AsyncMock()):
-            with mock.patch.object(
-                vs_module.VectorStore,
-                "health_check",
-                mock.AsyncMock(return_value=True),
-            ):
-                yield
+    with (
+        mock.patch.object(vs_module.VectorStore, "startup", mock.AsyncMock()),
+        mock.patch.object(vs_module.VectorStore, "shutdown", mock.AsyncMock()),
+        mock.patch.object(
+            vs_module.VectorStore,
+            "health_check",
+            mock.AsyncMock(return_value=True),
+        ),
+    ):
+        yield

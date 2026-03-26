@@ -76,10 +76,10 @@ async def check_account_status(user_email: str) -> str:
     logger.info("tool.check_account", email_prefix=user_email[:3] + "***")
     # Stub — replace with real user management API
     return (
-        f"Account status: Active | "
-        f"Plan: Pro | "
-        f"Next billing: 2026-04-15 | "
-        f"Usage this month: 68%"
+        "Account status: Active | "
+        "Plan: Pro | "
+        "Next billing: 2026-04-15 | "
+        "Usage this month: 68%"
     )
 
 

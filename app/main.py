@@ -9,9 +9,8 @@ from __future__ import annotations
 
 import time
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from typing import Callable
 
 import redis.asyncio as aioredis
 from fastapi import FastAPI, Request, Response
@@ -81,7 +80,6 @@ async def _query_log_callback(response: object, user_id: str) -> None:
     FIX: Persist every query to query_logs table.
     Called by RAGPipeline after each successful query.
     """
-    from app.models.domain import QueryResponse
     from app.repositories.document_repository import QueryLogRepository, get_session_factory
 
     try:

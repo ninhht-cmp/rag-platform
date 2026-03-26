@@ -114,7 +114,8 @@ class LLMService:
             f"[Source {i+1}] {c.content}" for i, c in enumerate(chunks)
         )
         return f"""You are a helpful AI assistant. Answer based ONLY on the provided context.
-If the answer is not in the context, say "I don't have information about this in the available documents."
+If the answer is not in the context, say \
+"I don't have information about this in the available documents."
 Always cite sources using [Source N] notation.
 
 Context:

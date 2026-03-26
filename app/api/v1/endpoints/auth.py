@@ -8,7 +8,7 @@ Authentication endpoints.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -53,13 +53,13 @@ def _create_token(
     expires_minutes: int,
     token_type: str = "access",
 ) -> str:
-    exp = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    exp = datetime.now(UTC) + timedelta(minutes=expires_minutes)
     payload = {
         "sub": user_id,
         "roles": roles,
         "type": token_type,
         "exp": int(exp.timestamp()),
-        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "iat": int(datetime.now(UTC).timestamp()),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 

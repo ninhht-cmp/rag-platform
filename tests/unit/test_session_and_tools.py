@@ -9,7 +9,7 @@ Unit tests for:
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -24,7 +24,6 @@ from app.utils.helpers import (
     stable_hash,
     truncate,
 )
-
 
 # ── Session Service tests ─────────────────────────────────────────
 
@@ -96,7 +95,11 @@ class TestSessionService:
     ) -> None:
         history = [
             {"role": "user", "content": "What is the policy?", "ts": "2026-01-01T00:00:00"},
-            {"role": "assistant", "content": "The policy allows 15 days.", "ts": "2026-01-01T00:00:01"},
+            {
+                "role": "assistant",
+                "content": "The policy allows 15 days.",
+                "ts": "2026-01-01T00:00:01",
+            },
         ]
         redis_mock.get = AsyncMock(return_value=json.dumps(history).encode())
         result = await session.format_for_prompt("sess_001")

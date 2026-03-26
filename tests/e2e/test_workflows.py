@@ -7,8 +7,8 @@ All LLM/Qdrant calls mocked — focus on data flow correctness.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -27,7 +27,7 @@ def make_token(email: str, roles: list[str]) -> str:
     payload = {
         "sub": email,
         "roles": roles,
-        "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
+        "exp": int((datetime.now(UTC) + timedelta(hours=1)).timestamp()),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
@@ -72,7 +72,11 @@ class TestKnowledgeBaseWorkflow:
             upload_resp = client.post(
                 "/api/v1/ingest/upload",
                 data={"use_case_id": "knowledge_base"},
-                files={"file": ("hr_policy.txt", b"Vacation policy: 15 days per year.", "text/plain")},
+                files={"file": (
+                    "hr_policy.txt",
+                    b"Vacation policy: 15 days per year.",
+                    "text/plain",
+                )},
                 headers=headers,
             )
         assert upload_resp.status_code == 202
@@ -81,7 +85,10 @@ class TestKnowledgeBaseWorkflow:
         # Step 3: Query
         mock_answer = QueryResponse(
             query="How many vacation days do I get?",
-            answer="You receive 15 days of annual vacation leave per year. [Source 1 — hr_policy.txt]",
+            answer=(
+            "You receive 15 days of annual vacation leave per year."
+            " [Source 1 — hr_policy.txt]"
+        ),
             use_case_id="knowledge_base",
             confidence=0.91,
             status=QueryStatus.COMPLETED,
@@ -155,7 +162,10 @@ class TestCustomerSupportWorkflow:
         session_id = "sess_test_001"
         mock_resp = QueryResponse(
             query="How do I reset my password?",
-            answer="To reset your password: 1. Click 'Forgot Password' on the login page. 2. Enter your email. 3. Check your inbox for the reset link.",
+            answer=(
+            "To reset your password: 1. Click 'Forgot Password' on the login page."
+            " 2. Enter your email. 3. Check your inbox for the reset link."
+        ),
             use_case_id="customer_support",
             confidence=0.88,
             status=QueryStatus.COMPLETED,
