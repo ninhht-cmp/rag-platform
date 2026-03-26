@@ -37,7 +37,7 @@ def _decode_token(token: str) -> TokenPayload:
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
+    credentials: HTTPAuthorizationCredentials | None = Security(_bearer),  # noqa: B008
 ) -> User:
     if credentials is None:
         raise HTTPException(
@@ -59,13 +59,13 @@ async def get_current_user(
     )
 
 
-def require_roles(*roles: Role):  # type: ignore[no-untyped-def]
+def require_roles(*roles: Role) -> User:
     """Dependency factory: check user has at least one of the required roles."""
-    async def _check(user: User = Depends(get_current_user)) -> User:
+    async def _check(user: User = Depends(get_current_user)) -> User:  # noqa: B008
         if not any(r in user.roles for r in roles):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Required roles: {[r.value for r in roles]}",
             )
         return user
-    return _check
+    return _check  # type: ignore[return-value]

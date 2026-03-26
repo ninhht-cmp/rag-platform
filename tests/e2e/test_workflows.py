@@ -7,7 +7,7 @@ All LLM/Qdrant calls mocked — focus on data flow correctness.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -27,7 +27,7 @@ def make_token(email: str, roles: list[str]) -> str:
     payload = {
         "sub": email,
         "roles": roles,
-        "exp": int((datetime.utcnow() + timedelta(hours=1)).timestamp()),
+        "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 

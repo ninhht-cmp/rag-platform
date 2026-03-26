@@ -5,7 +5,7 @@ Unit tests for JWT auth middleware and token generation.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi import HTTPException
@@ -25,7 +25,7 @@ def make_token(
     payload = {
         "sub": sub,
         "roles": roles or ["user"],
-        "exp": int((datetime.utcnow() + timedelta(minutes=exp_delta_minutes)).timestamp()),
+        "exp": int((datetime.now(timezone.utc) + timedelta(minutes=exp_delta_minutes)).timestamp()),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
@@ -52,7 +52,7 @@ class TestJWTDecode:
         payload = {
             "sub": "user@co.com",
             "roles": ["user"],
-            "exp": int((datetime.utcnow() + timedelta(hours=1)).timestamp()),
+            "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
         }
         token = jwt.encode(payload, "WRONG_SECRET", algorithm="HS256")
         with pytest.raises(HTTPException) as exc_info:
@@ -62,7 +62,7 @@ class TestJWTDecode:
     def test_missing_sub_field_raises_401(self) -> None:
         payload = {
             "roles": ["user"],
-            "exp": int((datetime.utcnow() + timedelta(hours=1)).timestamp()),
+            "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
         }
         token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
         # TokenPayload requires sub — should fail validation
@@ -92,7 +92,7 @@ class TestGetCurrentUser:
         payload = {
             "sub": "user@co.com",
             "roles": ["user", "super_secret_role_that_does_not_exist"],
-            "exp": int((datetime.utcnow() + timedelta(hours=1)).timestamp()),
+            "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
         }
         token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
         creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)

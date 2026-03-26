@@ -14,7 +14,6 @@ Design principles:
 """
 from __future__ import annotations
 
-import httpx
 from langchain_core.tools import tool
 
 from app.core.logging import get_logger
@@ -95,6 +94,7 @@ async def web_search_company(company_name: str) -> str:
     """
     logger.info("tool.web_search", company=company_name)
     # Stub — replace with Tavily/Serper/Brave Search API
+    # import httpx
     # async with httpx.AsyncClient() as client:
     #     resp = await client.get(SEARCH_API, params={"q": company_name})
     return (

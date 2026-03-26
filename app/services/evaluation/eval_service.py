@@ -7,9 +7,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any
 
-from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.plugin_registry import registry
 from app.models.domain import EvalMetrics
@@ -143,8 +141,16 @@ class EvaluationService:
         ]
         for name, val, threshold in [
             ("Faithfulness", metrics.faithfulness, thresholds.faithfulness if thresholds else 0),
-            ("Answer Relevancy", metrics.answer_relevancy, thresholds.answer_relevancy if thresholds else 0),
-            ("Context Recall", metrics.context_recall, thresholds.context_recall if thresholds else 0),
+            (
+                "Answer Relevancy",
+                metrics.answer_relevancy,
+                thresholds.answer_relevancy if thresholds else 0,
+            ),
+            (
+                "Context Recall",
+                metrics.context_recall,
+                thresholds.context_recall if thresholds else 0,
+            ),
         ]:
             flag = "✓" if val >= threshold else "✗"
             lines.append(f"  {flag} {name}: {val:.3f} (threshold: {threshold:.2f})")

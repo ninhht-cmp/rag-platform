@@ -7,8 +7,7 @@ Flow: Query → Intent route → Retrieve → Rerank → Generate → Cite
 from __future__ import annotations
 
 import time
-from collections.abc import AsyncIterator
-from typing import Callable, Awaitable
+from collections.abc import AsyncIterator, Awaitable, Callable
 
 import redis.asyncio as aioredis
 
@@ -67,8 +66,9 @@ class CrossEncoderReranker:
         if not chunks:
             return chunks
         try:
-            from sentence_transformers import CrossEncoder  # type: ignore[import]
             import asyncio
+
+            from sentence_transformers import CrossEncoder  # type: ignore[import]
             if self._model is None:
                 loop = asyncio.get_running_loop()
                 self._model = await loop.run_in_executor(
@@ -79,7 +79,7 @@ class CrossEncoderReranker:
             scores: list[float] = await loop.run_in_executor(
                 None, lambda p=pairs: self._model.predict(p).tolist()  # type: ignore[union-attr]
             )
-            for chunk, score in zip(chunks, scores):
+            for chunk, score in zip(chunks, scores, strict=True):
                 chunk.score = float(score)
             chunks.sort(key=lambda c: c.score, reverse=True)
             return chunks[:top_k]
@@ -105,21 +105,34 @@ class SemanticCache:
     async def get(self, query: str, plugin_id: str, rbac_context: str = "") -> QueryResponse | None:
         import orjson
         key = self._key(query, plugin_id, rbac_context)
-        data = await self._r.get(key)
+        try:
+            data = await self._r.get(key)
+        except Exception as exc:
+            logger.warning("semantic_cache.get_error", error=str(exc))
+            return None
         if data:
             logger.debug("semantic_cache.hit", key=key)
             return QueryResponse.model_validate(orjson.loads(data))
         return None
 
-    async def set(self, query: str, plugin_id: str, response: QueryResponse, rbac_context: str = "") -> None:
+    async def set(
+        self,
+        query: str,
+        plugin_id: str,
+        response: QueryResponse,
+        rbac_context: str = "",
+    ) -> None:
         import orjson
         key = self._key(query, plugin_id, rbac_context)
-        await self._r.set(
-            key,
-            orjson.dumps(response.model_dump(mode="json")),
-            ex=settings.REDIS_SEMANTIC_CACHE_TTL,
-        )
-        logger.debug("semantic_cache.set", key=key)
+        try:
+            await self._r.set(
+                key,
+                orjson.dumps(response.model_dump(mode="json")),
+                ex=settings.REDIS_SEMANTIC_CACHE_TTL,
+            )
+            logger.debug("semantic_cache.set", key=key)
+        except Exception as exc:
+            logger.warning("semantic_cache.set_error", error=str(exc))
 
 
 # ── Main RAG Pipeline ─────────────────────────────────────────────
@@ -205,17 +218,18 @@ class RAGPipeline:
         plugin: UseCasePlugin,
         query: str,
         confidence: float,
+        has_chunks: bool = True,
     ) -> tuple[bool, str]:
         # Check escalation pattern FIRST (more important)
         if plugin.escalation_pattern:
             import re
             if re.search(plugin.escalation_pattern, query, re.IGNORECASE):
                 return True, "Query matches escalation pattern"
-        
-        # Then check confidence
-        if confidence < 0.50:
+
+        # Only check confidence when we actually have chunks to score
+        if has_chunks and confidence < 0.50:
             return True, f"Low confidence score: {confidence:.2f}"
-        
+
         return False, ""
 
     async def _persist_audit_log(self, response: QueryResponse, user: User) -> None:
@@ -276,10 +290,10 @@ class RAGPipeline:
 
         if not chunks:
             logger.warning("rag.pipeline.no_chunks", plugin=plugin.id)
-            
+
             # Check escalation pattern even without chunks
-            escalated, escalation_reason = self._should_escalate(plugin, request.query, 0.0)
-            
+            escalated, escalation_reason = self._should_escalate(plugin, request.query, 0.0, has_chunks=False)
+
             response = QueryResponse(
                 query=request.query,
                 answer="I don't have information about this topic in the available documents.",
@@ -365,13 +379,13 @@ class RAGPipeline:
 
         try:
             safe_query = _sanitize_query(request.query)
-        # except ValueError as exc:
-        #     async def _error_gen() -> AsyncIterator[str]:
-        #         yield str(exc)
-        #     return _error_gen()
         except ValueError as exc:
+            # Capture error message before exc goes out of scope
+            error_msg = str(exc)
+
             async def _error_gen() -> AsyncIterator[str]:
-                yield str(exc)
+                yield error_msg
+
             async for token in _error_gen():
                 yield token
             return

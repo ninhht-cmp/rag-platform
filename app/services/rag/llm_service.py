@@ -10,9 +10,9 @@ LLM abstraction with:
 from __future__ import annotations
 
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
-from typing import Any, Callable, Awaitable
+from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from langchain_anthropic import ChatAnthropic

@@ -6,9 +6,9 @@ PDF / DOCX / TXT / HTML → clean text → chunks → embeddings → Qdrant
 """
 from __future__ import annotations
 
+import contextlib
 import io
 import time
-from pathlib import Path
 from typing import Any
 
 from app.core.logging import get_logger
@@ -70,6 +70,7 @@ def _validate_content_type(content: bytes, claimed_type: str) -> str:
 
 async def _extract_pdf(content: bytes) -> str:
     import asyncio
+
     from pypdf import PdfReader
 
     def _extract() -> str:
@@ -82,6 +83,7 @@ async def _extract_pdf(content: bytes) -> str:
 
 async def _extract_docx(content: bytes) -> str:
     import asyncio
+
     from docx import Document as DocxDocument
 
     def _extract() -> str:
@@ -231,14 +233,15 @@ class IngestionService:
 
             texts = [c.content for c in chunks]
             embeddings = await self._embedding.embed_texts(texts)
-            for chunk, emb in zip(chunks, embeddings):
+            # strict=True ensures mismatch between chunks and embeddings raises immediately
+            # rather than silently dropping un-embedded chunks
+            for chunk, emb in zip(chunks, embeddings, strict=True):
                 chunk.embedding = emb
 
             await self._vector_store.ensure_collection(plugin.collection_name)
-            try:
+            # Suppress error if previous version doesn't exist yet — not fatal
+            with contextlib.suppress(Exception):
                 await self._vector_store.delete_by_document(plugin.collection_name, document.id)
-            except Exception:
-                pass
 
             count = await self._vector_store.upsert_chunks(plugin.collection_name, chunks)
             elapsed = int(time.monotonic() * 1000) - start_ms

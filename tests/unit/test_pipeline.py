@@ -217,9 +217,7 @@ class TestRAGPipeline:
         # Verify graceful response
         assert response.confidence == 0.0
         assert "don't have information" in response.answer.lower()
-        # Accept both COMPLETED and ESCALATED status
-        # COMPLETED when no escalation pattern, ESCALATED when pattern matches
-        assert response.status in [QueryStatus.COMPLETED, QueryStatus.ESCALATED]
+        assert response.status == QueryStatus.COMPLETED
 
     @pytest.mark.asyncio
     async def test_escalation_on_pattern_match(

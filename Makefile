@@ -37,7 +37,7 @@ setup: ## Full local setup: create venv + install deps + copy .env
 		"python-jose[cryptography]" "passlib[bcrypt]" "bcrypt==4.0.1" \
 		structlog tenacity orjson \
 		jinja2 python-multipart httpx numpy \
-		pytest pytest-asyncio
+		pytest pytest-asyncio pytest-cov
 	@echo "$(CYAN)Step 4: Setting up .env...$(RESET)"
 	@[ -f .env ] && echo ".env already exists — skipping" || (cp .env.example .env && echo "Created .env — fill in SECRET_KEY and OPENAI_API_KEY")
 	@echo ""
@@ -106,7 +106,7 @@ install: ## Install/update dependencies into existing venv
 		"python-jose[cryptography]" "passlib[bcrypt]" "bcrypt==4.0.1" \
 		structlog tenacity orjson \
 		jinja2 python-multipart httpx numpy \
-		pytest pytest-asyncio
+		pytest pytest-asyncio pytest-cov
 
 # ── Quality ───────────────────────────────────────────────────────
 lint: ## Run ruff linter

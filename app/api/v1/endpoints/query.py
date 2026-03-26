@@ -10,6 +10,8 @@ wired in main.py lifespan is applied before the first request.
 """
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
@@ -39,8 +41,8 @@ def get_pipeline() -> RAGPipeline:
 @router.post("", response_model=QueryResponse, summary="Query the RAG platform")
 async def query(
     request: QueryRequest,
-    user: User = Depends(get_current_user),
-    pipeline: RAGPipeline = Depends(get_pipeline),
+    user: User = Depends(get_current_user),  # noqa: B008
+    pipeline: RAGPipeline = Depends(get_pipeline),  # noqa: B008
 ) -> QueryResponse:
     from app.core.plugin_registry import registry
     from app.services.agent.agent_service import AgentService
@@ -49,7 +51,10 @@ async def query(
         plugin = registry.get(request.use_case_id)
     else:
         user_roles = [r.value for r in user.roles]
-        plugin = registry.route_by_intent(request.query, user_roles) or registry.get("knowledge_base")
+        plugin = (
+            registry.route_by_intent(request.query, user_roles)
+            or registry.get("knowledge_base")
+        )
 
     if plugin and plugin.agent_tools:
         agent = AgentService()
@@ -61,10 +66,10 @@ async def query(
 @router.post("/stream", summary="Stream query response (SSE)")
 async def query_stream(
     request: QueryRequest,
-    user: User = Depends(get_current_user),
-    pipeline: RAGPipeline = Depends(get_pipeline),
+    user: User = Depends(get_current_user),  # noqa: B008
+    pipeline: RAGPipeline = Depends(get_pipeline),  # noqa: B008
 ) -> StreamingResponse:
-    async def _generate():  # type: ignore[return]
+    async def _generate() -> AsyncIterator[str]:
         async for token in pipeline.stream(request, user):
             yield f"data: {token}\n\n"
         yield "data: [DONE]\n\n"

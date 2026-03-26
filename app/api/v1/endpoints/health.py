@@ -11,7 +11,7 @@ FIXES applied:
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from app.api.v1.middleware.auth import require_roles
 from app.core.config import settings
@@ -23,10 +23,10 @@ from app.services.rag.vector_store import get_vector_store
 logger = get_logger(__name__)
 router = APIRouter(tags=["Health"])
 
-_health_engine = None
+_health_engine: AsyncEngine | None = None
 
 
-def _get_health_engine():
+def _get_health_engine() -> AsyncEngine:
     global _health_engine
     if _health_engine is None:
         _health_engine = create_async_engine(
@@ -106,7 +106,7 @@ async def readiness() -> HealthStatus:
 @router.get(
     "/admin/plugins",
     summary="List registered plugins",
-    dependencies=[Depends(require_roles(Role.ADMIN))],
+    dependencies=[Depends(require_roles(Role.ADMIN))],  # noqa: B008
 )
 async def list_plugins() -> dict:
     plugins = registry.get_active()

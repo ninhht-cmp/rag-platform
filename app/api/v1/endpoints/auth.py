@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from app.api.v1.middleware.auth import get_current_user
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.models.domain import Role, User
+from app.models.domain import User
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -77,7 +77,7 @@ def _authenticate(email: str, password: str) -> tuple[str, list[str], str] | Non
 
 @router.post("/token", response_model=TokenResponse, summary="Get access token")
 async def login(
-    form: OAuth2PasswordRequestForm = Depends(),
+    form: OAuth2PasswordRequestForm = Depends(),  # noqa: B008
 ) -> TokenResponse:
     """
     OAuth2 password flow. Returns JWT access token + refresh token.
@@ -120,7 +120,7 @@ async def login(
 
 
 @router.get("/me", summary="Get current user info")
-async def me(user: User = Depends(get_current_user)) -> dict:
+async def me(user: User = Depends(get_current_user)) -> dict:  # noqa: B008
     return {
         "id": str(user.id),
         "email": user.email,
