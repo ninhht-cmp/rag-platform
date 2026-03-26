@@ -99,7 +99,7 @@ jobs:
     # Versions match docker-compose.yml and qdrant-client==1.17.1 in pyproject.toml.
     services:
       qdrant:
-        image: qdrant/qdrant:v1.17.1
+        image: qdrant/qdrant:v1.17.0
         ports:
           - 6333:6333
         options: >-
