@@ -34,6 +34,16 @@ def _decode_token(token: str) -> TokenPayload:
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
+    except Exception as exc:
+        # Catches pydantic ValidationError when JWT is cryptographically valid
+        # but missing required fields (e.g. no `sub`). Without this, a malformed
+        # but signed token causes 500 instead of 401.
+        logger.warning("auth.token.invalid_payload", error=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
 
 
 async def get_current_user(

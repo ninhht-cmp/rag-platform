@@ -183,8 +183,14 @@ class TestIngestionService:
                 content=b"\x00\x01\x02\x03",
                 use_case_id="knowledge_base",
             )
+        # Content type validation rejects binary content regardless of which
+        # code path runs: the magic-bytes check (when python-magic is installed)
+        # produces "File content does not match an allowed type", while the
+        # fallback produces "Unsupported content type". Both result in FAILED —
+        # assert on the observable behavior, not the internal message string.
         assert result.status == DocumentStatus.FAILED
-        assert "Unsupported content type" in (result.error_message or "")
+        assert result.error_message is not None
+        assert result.chunks_created == 0
 
     @pytest.mark.asyncio
     async def test_ingest_empty_document_returns_failed(self, document: Document) -> None:

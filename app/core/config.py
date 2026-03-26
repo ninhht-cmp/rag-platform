@@ -135,7 +135,19 @@ class Settings(BaseSettings):
     def qdrant_config(self) -> dict[str, Any]:
         cfg: dict[str, Any] = {"url": self.QDRANT_URL, "timeout": self.QDRANT_TIMEOUT}
         if self.QDRANT_API_KEY:
-            cfg["api_key"] = self.QDRANT_API_KEY
+            # Only attach api_key when the transport is encrypted.
+            # Qdrant client correctly warns when a key is sent over plain HTTP;
+            # in local dev the server runs without auth so the key should not be
+            # sent at all. In production, an http:// QDRANT_URL is a config error.
+            if self.QDRANT_URL.startswith("https://"):
+                cfg["api_key"] = self.QDRANT_API_KEY
+            elif self.is_production:
+                raise ValueError(
+                    "QDRANT_URL must use https:// in production when QDRANT_API_KEY "
+                    f"is set. Got: {self.QDRANT_URL}"
+                )
+            # local/staging + http + api_key → omit key silently.
+            # docker-compose Qdrant has no auth; the key is a no-op here.
         return cfg
 
     def model_post_init(self, __context: Any) -> None:
