@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.v1.endpoints import analytics, auth, health, ingestion, query
 from app.api.v1.middleware.rate_limiter import RateLimiterMiddleware
-from app.core.config import Environment, settings
+from app.core.config import settings
 from app.core.logging import get_logger, setup_logging
 from app.plugins import register_all_plugins
 from app.services.rag.vector_store import get_vector_store
@@ -45,8 +45,8 @@ async def _budget_checker(use_case_id: str) -> None:
     Called by LLMService.generate() before every LLM call.
     """
     from fastapi import HTTPException
-    from app.repositories.document_repository import get_session_factory
-    from app.repositories.document_repository import TokenUsageRepository
+
+    from app.repositories.document_repository import TokenUsageRepository, get_session_factory
 
     try:
         async with get_session_factory()() as session:
@@ -80,9 +80,7 @@ async def _query_log_callback(response: object, user_id: str) -> None:
     FIX: Persist every query to query_logs table.
     Called by RAGPipeline after each successful query.
     """
-    from app.repositories.document_repository import get_session_factory
-    from app.repositories.document_repository import QueryLogRepository
-    from app.models.domain import QueryResponse
+    from app.repositories.document_repository import QueryLogRepository, get_session_factory
 
     try:
         async with get_session_factory()() as session:
@@ -167,7 +165,7 @@ def create_app() -> FastAPI:
     app.add_middleware(RateLimiterMiddleware, redis_client=None)
 
     @app.middleware("http")
-    async def request_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
+    async def request_middleware(request: Request, call_next: Callable) -> Response:  # type: ignore[type-arg]
         request_id = request.headers.get("X-Request-ID", str(uuid.uuid4())[:8])
         start = time.monotonic()
         response: Response = await call_next(request)

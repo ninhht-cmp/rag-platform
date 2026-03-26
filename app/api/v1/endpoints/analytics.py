@@ -23,14 +23,14 @@ _admin_required = require_roles(Role.ADMIN)
 async def get_stats(
     use_case_id: str | None = None,
     days: int = 7,
-    _: object = Depends(_admin_required),
+    _: object = Depends(_admin_required),  # noqa: B008
 ) -> dict:
     """
     Returns query volume, avg confidence, escalation rate, and token usage per use case.
     Queries real DB; falls back to empty stats if DB is unavailable.
     """
     try:
-        from app.repositories.document_repository import get_session_factory, QueryLogRepository
+        from app.repositories.document_repository import QueryLogRepository, get_session_factory
         async with get_session_factory()() as session:
             repo = QueryLogRepository(session)
             return await repo.get_stats(use_case_id=use_case_id, days=days)
@@ -63,13 +63,13 @@ async def get_stats(
 )
 async def get_eval_results(
     use_case_id: str,
-    _: object = Depends(_admin_required),
+    _: object = Depends(_admin_required),  # noqa: B008
 ) -> EvalMetrics | None:
     if registry.get(use_case_id) is None:
         raise HTTPException(status_code=404, detail=f"Use case '{use_case_id}' not found")
 
     try:
-        from app.repositories.document_repository import get_session_factory, EvalRepository
+        from app.repositories.document_repository import EvalRepository, get_session_factory
         async with get_session_factory()() as session:
             repo = EvalRepository(session)
             return await repo.latest(use_case_id)
@@ -85,7 +85,7 @@ async def get_eval_results(
 )
 async def trigger_eval(
     use_case_id: str,
-    _: object = Depends(_admin_required),
+    _: object = Depends(_admin_required),  # noqa: B008
 ) -> EvalMetrics:
     if registry.get(use_case_id) is None:
         raise HTTPException(status_code=404, detail=f"Use case '{use_case_id}' not found")
@@ -94,13 +94,18 @@ async def trigger_eval(
         EvalSample(
             question="What is the main purpose of this system?",
             ground_truth="This is a RAG platform for enterprise AI use cases.",
-            contexts=["The RAG Platform enables companies to build AI applications on their own data."],
+            contexts=[
+                "The RAG Platform enables companies to build AI applications on their own data.",
+            ],
             answer="The system is an enterprise RAG platform for building AI applications.",
         ),
         EvalSample(
             question="How many use cases are supported?",
             ground_truth="Four use cases: knowledge base, support, document Q&A, and sales.",
-            contexts=["The platform supports four use cases: Internal KB, Customer Support, Document Q&A, Sales Automation."],
+            contexts=[
+                "The platform supports four use cases: "
+                "Internal KB, Customer Support, Document Q&A, Sales Automation.",
+            ],
             answer="The platform supports four use cases.",
         ),
     ]
@@ -110,7 +115,7 @@ async def trigger_eval(
 
     # Persist result
     try:
-        from app.repositories.document_repository import get_session_factory, EvalRepository
+        from app.repositories.document_repository import EvalRepository, get_session_factory
         async with get_session_factory()() as session:
             repo = EvalRepository(session)
             await repo.save_result(result)

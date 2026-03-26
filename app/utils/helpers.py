@@ -11,7 +11,6 @@ import re
 import time
 import uuid
 from collections.abc import Callable
-from functools import wraps
 from typing import Any, TypeVar
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -96,7 +95,7 @@ class Timer:
         self._start: float = 0.0
         self.elapsed_ms: int = 0
 
-    def __enter__(self) -> "Timer":
+    def __enter__(self) -> Timer:
         self._start = time.monotonic()
         return self
 

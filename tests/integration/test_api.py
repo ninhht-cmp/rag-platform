@@ -6,8 +6,8 @@ Uses FastAPI TestClient — no real LLM/Qdrant calls.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -22,7 +22,7 @@ def _make_token(roles: list[str] = None, user_id: str = "test_user") -> str:
     payload = {
         "sub": user_id,
         "roles": roles or ["user"],
-        "exp": int((datetime.utcnow() + timedelta(hours=1)).timestamp()),
+        "exp": int((datetime.now(UTC) + timedelta(hours=1)).timestamp()),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
@@ -215,7 +215,11 @@ class TestIngestionEndpoint:
             resp = client.post(
                 "/api/v1/ingest/upload",
                 data={"use_case_id": "knowledge_base"},
-                files={"file": ("policy.txt", b"Company vacation policy: 15 days per year.", "text/plain")},
+                files={"file": (
+                    "policy.txt",
+                    b"Company vacation policy: 15 days per year.",
+                    "text/plain",
+                )},
                 headers=auth_headers,
             )
 

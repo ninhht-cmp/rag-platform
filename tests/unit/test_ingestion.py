@@ -9,7 +9,7 @@ Unit tests for ingestion service:
 """
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -19,7 +19,6 @@ from app.services.ingestion.ingestion_service import (
     chunk_text,
     redact_pii,
 )
-
 
 # ── Chunking tests ────────────────────────────────────────────────
 
@@ -140,7 +139,9 @@ class TestIngestionService:
                 side_effect=lambda texts: [[0.1] * 1024] * len(texts)
             )
             mock_vs.return_value.ensure_collection = AsyncMock()
-            mock_vs.return_value.upsert_chunks = AsyncMock(side_effect=lambda col, chunks: len(chunks))
+            mock_vs.return_value.upsert_chunks = AsyncMock(
+                side_effect=lambda col, chunks: len(chunks)
+            )
 
             svc = IngestionService()
             svc._embedding = mock_emb.return_value

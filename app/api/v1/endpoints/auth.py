@@ -8,7 +8,7 @@ Authentication endpoints.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from app.api.v1.middleware.auth import get_current_user
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.models.domain import Role, User
+from app.models.domain import User
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -53,13 +53,13 @@ def _create_token(
     expires_minutes: int,
     token_type: str = "access",
 ) -> str:
-    exp = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    exp = datetime.now(UTC) + timedelta(minutes=expires_minutes)
     payload = {
         "sub": user_id,
         "roles": roles,
         "type": token_type,
         "exp": int(exp.timestamp()),
-        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "iat": int(datetime.now(UTC).timestamp()),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
@@ -77,7 +77,7 @@ def _authenticate(email: str, password: str) -> tuple[str, list[str], str] | Non
 
 @router.post("/token", response_model=TokenResponse, summary="Get access token")
 async def login(
-    form: OAuth2PasswordRequestForm = Depends(),
+    form: OAuth2PasswordRequestForm = Depends(),  # noqa: B008
 ) -> TokenResponse:
     """
     OAuth2 password flow. Returns JWT access token + refresh token.
@@ -120,7 +120,7 @@ async def login(
 
 
 @router.get("/me", summary="Get current user info")
-async def me(user: User = Depends(get_current_user)) -> dict:
+async def me(user: User = Depends(get_current_user)) -> dict:  # noqa: B008
     return {
         "id": str(user.id),
         "email": user.email,

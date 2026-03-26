@@ -5,7 +5,7 @@ Unit tests for JWT auth middleware and token generation.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
@@ -25,7 +25,7 @@ def make_token(
     payload = {
         "sub": sub,
         "roles": roles or ["user"],
-        "exp": int((datetime.utcnow() + timedelta(minutes=exp_delta_minutes)).timestamp()),
+        "exp": int((datetime.now(UTC) + timedelta(minutes=exp_delta_minutes)).timestamp()),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
@@ -52,7 +52,7 @@ class TestJWTDecode:
         payload = {
             "sub": "user@co.com",
             "roles": ["user"],
-            "exp": int((datetime.utcnow() + timedelta(hours=1)).timestamp()),
+            "exp": int((datetime.now(UTC) + timedelta(hours=1)).timestamp()),
         }
         token = jwt.encode(payload, "WRONG_SECRET", algorithm="HS256")
         with pytest.raises(HTTPException) as exc_info:
@@ -62,12 +62,12 @@ class TestJWTDecode:
     def test_missing_sub_field_raises_401(self) -> None:
         payload = {
             "roles": ["user"],
-            "exp": int((datetime.utcnow() + timedelta(hours=1)).timestamp()),
+            "exp": int((datetime.now(UTC) + timedelta(hours=1)).timestamp()),
         }
         token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
         # TokenPayload requires sub — should fail validation
-        with pytest.raises(Exception):
-            payload_obj = _decode_token(token)
+        with pytest.raises(HTTPException):
+            _decode_token(token)
 
 
 class TestGetCurrentUser:
@@ -92,7 +92,7 @@ class TestGetCurrentUser:
         payload = {
             "sub": "user@co.com",
             "roles": ["user", "super_secret_role_that_does_not_exist"],
-            "exp": int((datetime.utcnow() + timedelta(hours=1)).timestamp()),
+            "exp": int((datetime.now(UTC) + timedelta(hours=1)).timestamp()),
         }
         token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
         creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
@@ -104,9 +104,10 @@ class TestGetCurrentUser:
 class TestRequireRoles:
     @pytest.mark.asyncio
     async def test_user_with_required_role_passes(self) -> None:
+        import uuid
+
         from app.api.v1.middleware.auth import require_roles
         from app.models.domain import User
-        import uuid
 
         admin_user = User(
             id=uuid.uuid4(), email="a@co.com", name="Admin",
@@ -119,9 +120,10 @@ class TestRequireRoles:
 
     @pytest.mark.asyncio
     async def test_user_without_required_role_raises_403(self) -> None:
+        import uuid
+
         from app.api.v1.middleware.auth import require_roles
         from app.models.domain import User
-        import uuid
 
         regular_user = User(
             id=uuid.uuid4(), email="u@co.com", name="User",
@@ -134,9 +136,10 @@ class TestRequireRoles:
 
     @pytest.mark.asyncio
     async def test_any_matching_role_passes(self) -> None:
+        import uuid
+
         from app.api.v1.middleware.auth import require_roles
         from app.models.domain import User
-        import uuid
 
         sales_user = User(
             id=uuid.uuid4(), email="s@co.com", name="Sales",

@@ -10,9 +10,9 @@ LLM abstraction with:
 from __future__ import annotations
 
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
-from typing import Any, Callable, Awaitable
+from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from langchain_anthropic import ChatAnthropic
@@ -114,7 +114,8 @@ class LLMService:
             f"[Source {i+1}] {c.content}" for i, c in enumerate(chunks)
         )
         return f"""You are a helpful AI assistant. Answer based ONLY on the provided context.
-If the answer is not in the context, say "I don't have information about this in the available documents."
+If the answer is not in the context, say \
+"I don't have information about this in the available documents."
 Always cite sources using [Source N] notation.
 
 Context:

@@ -119,7 +119,7 @@ class Settings(BaseSettings):
         return v
 
     @model_validator(mode="after")
-    def validate_api_keys(self) -> "Settings":
+    def validate_api_keys(self) -> Settings:
         if self.ENVIRONMENT == Environment.PRODUCTION:
             if self.LLM_PROVIDER == LLMProvider.ANTHROPIC and not self.ANTHROPIC_API_KEY:
                 raise ValueError("ANTHROPIC_API_KEY required in production")
@@ -137,6 +137,15 @@ class Settings(BaseSettings):
         if self.QDRANT_API_KEY:
             cfg["api_key"] = self.QDRANT_API_KEY
         return cfg
+
+    def model_post_init(self, __context: Any) -> None:
+        """Validate SECRET_KEY strength in production."""
+        if self.ENVIRONMENT == Environment.PRODUCTION and len(self.SECRET_KEY) < 64:
+            import warnings
+            warnings.warn(
+                "SECRET_KEY should be at least 64 characters in production",
+                stacklevel=2,
+            )
 
 
 @lru_cache

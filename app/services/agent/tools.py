@@ -14,7 +14,6 @@ Design principles:
 """
 from __future__ import annotations
 
-import httpx
 from langchain_core.tools import tool
 
 from app.core.logging import get_logger
@@ -77,10 +76,10 @@ async def check_account_status(user_email: str) -> str:
     logger.info("tool.check_account", email_prefix=user_email[:3] + "***")
     # Stub — replace with real user management API
     return (
-        f"Account status: Active | "
-        f"Plan: Pro | "
-        f"Next billing: 2026-04-15 | "
-        f"Usage this month: 68%"
+        "Account status: Active | "
+        "Plan: Pro | "
+        "Next billing: 2026-04-15 | "
+        "Usage this month: 68%"
     )
 
 
@@ -95,6 +94,7 @@ async def web_search_company(company_name: str) -> str:
     """
     logger.info("tool.web_search", company=company_name)
     # Stub — replace with Tavily/Serper/Brave Search API
+    # import httpx
     # async with httpx.AsyncClient() as client:
     #     resp = await client.get(SEARCH_API, params={"q": company_name})
     return (

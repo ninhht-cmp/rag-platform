@@ -38,6 +38,7 @@ def _decode_token_cached(token: str) -> tuple[str, str] | None:
     """
     try:
         from jose import jwt
+
         from app.core.config import settings
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         user_id = payload.get("sub", "unknown")
@@ -59,8 +60,8 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         try:
             from app.main import get_redis
             return get_redis()
-        except Exception:
-            raise RuntimeError("Redis not available")
+        except Exception as exc:
+            raise RuntimeError("Redis not available") from exc
 
     async def dispatch(self, request: Request, call_next: object) -> Response:
         if request.url.path in ("/health", "/health/ready"):
