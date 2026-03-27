@@ -125,4 +125,3 @@ async def list_plugins() -> dict[str, object]:
             for p in plugins
         ],
     }
-
