@@ -201,6 +201,16 @@ def create_app() -> FastAPI:
     app.include_router(ingestion.router, prefix=prefix)
     app.include_router(analytics.router, prefix=prefix)
 
+    # ── Slack integration (opt-in via SLACK_ENABLED=true) ─────────
+    if settings.SLACK_ENABLED:
+        from app.api.v1.endpoints import slack as slack_endpoint  # noqa: PLC0415
+        app.include_router(slack_endpoint.router, prefix=prefix)
+        logger.info(
+            "app.slack.enabled",
+            bot_token_set=bool(settings.SLACK_BOT_TOKEN),
+            signing_secret_set=bool(settings.SLACK_SIGNING_SECRET),
+        )
+
     return app
 
 

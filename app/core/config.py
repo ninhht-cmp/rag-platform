@@ -110,6 +110,15 @@ class Settings(BaseSettings):
     FEATURE_SEMANTIC_CACHE: bool = True
     FEATURE_CITATION: bool = True
 
+    # ── Slack ─────────────────────────────────────────
+    # SLACK_BOT_TOKEN:      Settings → OAuth & Permissions → Bot Token (xoxb-...)
+    # SLACK_SIGNING_SECRET: Settings → Basic Information → Signing Secret
+    # SLACK_APP_TOKEN:      Settings → Basic Information → App-Level Token (xapp-...) [Socket Mode only]
+    SLACK_ENABLED: bool = False
+    SLACK_BOT_TOKEN: str = ""
+    SLACK_SIGNING_SECRET: str = ""
+    SLACK_APP_TOKEN: str = ""  # optional: only needed for Socket Mode (local dev without public URL)
+
     @field_validator("LLM_TEMPERATURE")
     @classmethod
     def validate_temperature(cls, v: float) -> float:
@@ -124,6 +133,11 @@ class Settings(BaseSettings):
                 raise ValueError("ANTHROPIC_API_KEY required in production")
             if self.LLM_PROVIDER == LLMProvider.OPENAI and not self.OPENAI_API_KEY:
                 raise ValueError("OPENAI_API_KEY required in production")
+            if self.SLACK_ENABLED:
+                if not self.SLACK_BOT_TOKEN:
+                    raise ValueError("SLACK_BOT_TOKEN required when SLACK_ENABLED=true")
+                if not self.SLACK_SIGNING_SECRET:
+                    raise ValueError("SLACK_SIGNING_SECRET required when SLACK_ENABLED=true")
         return self
 
     @property
