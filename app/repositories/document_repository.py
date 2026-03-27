@@ -6,6 +6,7 @@ PostgreSQL repository for document metadata and query audit logs.
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -52,9 +53,9 @@ def get_session_factory() -> async_sessionmaker:  # type: ignore[type-arg]
     return _session_factory
 
 
-async def get_db_session() -> AsyncSession:
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async with get_session_factory()() as session:
-        yield session  # type: ignore[misc]
+        yield session
 
 
 # ── Document Repository ───────────────────────────────────────────

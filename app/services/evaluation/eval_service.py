@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from typing import cast
 
 from app.core.logging import get_logger
 from app.core.plugin_registry import registry
@@ -88,11 +89,14 @@ class EvaluationService:
         dataset = Dataset.from_dict(data)
 
         loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            None,
-            lambda: evaluate(
-                dataset,
-                metrics=[faithfulness, answer_relevancy, context_recall],
+        result: dict[str, float] = cast(
+            dict[str, float],
+            await loop.run_in_executor(
+                None,
+                lambda: evaluate(
+                    dataset,
+                    metrics=[faithfulness, answer_relevancy, context_recall],
+                ),
             ),
         )
         return {

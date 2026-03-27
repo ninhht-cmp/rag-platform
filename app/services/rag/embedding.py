@@ -129,7 +129,7 @@ class EmbeddingService:
 
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
-            embeddings: np.ndarray = await loop.run_in_executor(
+            batch_result: np.ndarray = await loop.run_in_executor(
                 None,
                 lambda b=batch: model.encode(
                     b,
@@ -137,7 +137,7 @@ class EmbeddingService:
                     show_progress_bar=False,
                 ),
             )
-            all_embeddings.extend(embeddings.tolist())
+            all_embeddings.extend(batch_result.tolist())
 
         logger.debug(
             "embedding.computed",

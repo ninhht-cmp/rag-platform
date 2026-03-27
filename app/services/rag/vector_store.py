@@ -14,6 +14,7 @@ from typing import Any
 
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qm
+from qdrant_client.http.models import TextIndexType
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
@@ -88,7 +89,7 @@ class VectorStore:
             collection_name=collection_name,
             field_name="content",
             field_schema=qm.TextIndexParams(
-                type="text",
+                type=TextIndexType.TEXT,
                 tokenizer=qm.TokenizerType.WORD,
                 min_token_len=2,
                 max_token_len=20,
@@ -188,9 +189,9 @@ class VectorStore:
             )
 
         # ── Search ────────────────────────────────────────────────
-        results = await self.client.search(
+        search_result = await self.client.query_points(
             collection_name=collection_name,
-            query_vector=query_vector,
+            query=query_vector,
             limit=top_k,
             score_threshold=score_threshold,
             query_filter=qdrant_filter,
@@ -198,7 +199,7 @@ class VectorStore:
         )
 
         chunks: list[DocumentChunk] = []
-        for r in results:
+        for r in search_result.points:
             payload = r.payload or {}
             chunks.append(
                 DocumentChunk(

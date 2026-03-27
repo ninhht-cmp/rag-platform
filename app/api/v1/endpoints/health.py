@@ -11,6 +11,8 @@ FIXES applied:
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
@@ -18,7 +20,7 @@ from app.api.v1.middleware.auth import require_roles
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.plugin_registry import registry
-from app.models.domain import HealthStatus, Role
+from app.models.domain import HealthStatus, Role, User
 from app.services.rag.vector_store import get_vector_store
 
 logger = get_logger(__name__)
@@ -64,7 +66,7 @@ async def readiness() -> HealthStatus:
     # Check Qdrant
     try:
         vs = get_vector_store()
-        ok = await vs.health_check()
+        ok: bool = await vs.health_check()  # type: ignore[assignment]
         components["qdrant"] = "healthy" if ok else "unhealthy"
         if not ok:
             overall = "degraded"
@@ -110,7 +112,7 @@ async def readiness() -> HealthStatus:
     summary="List registered plugins",
     dependencies=[Depends(require_roles(Role.ADMIN))],  # noqa: B008
 )
-async def list_plugins() -> dict:
+async def list_plugins() -> dict[str, object]:
     plugins = registry.get_active()
     return {
         "total": len(plugins),
@@ -125,3 +127,4 @@ async def list_plugins() -> dict:
             for p in plugins
         ],
     }
+
