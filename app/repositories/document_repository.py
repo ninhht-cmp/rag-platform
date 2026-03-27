@@ -6,6 +6,7 @@ PostgreSQL repository for document metadata and query audit logs.
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -24,7 +25,7 @@ from app.models.domain import Document, DocumentStatus, EvalMetrics, QueryRespon
 logger = get_logger(__name__)
 
 _engine: AsyncEngine | None = None
-_session_factory: async_sessionmaker | None = None  # type: ignore[type-arg]
+_session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
 def get_engine() -> AsyncEngine:
@@ -40,7 +41,7 @@ def get_engine() -> AsyncEngine:
     return _engine
 
 
-def get_session_factory() -> async_sessionmaker:  # type: ignore[type-arg]
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
     global _session_factory
     if _session_factory is None:
         _session_factory = async_sessionmaker(
@@ -52,9 +53,9 @@ def get_session_factory() -> async_sessionmaker:  # type: ignore[type-arg]
     return _session_factory
 
 
-async def get_db_session() -> AsyncSession:
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async with get_session_factory()() as session:
-        yield session  # type: ignore[misc]
+        yield session
 
 
 # ── Document Repository ───────────────────────────────────────────

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 import redis.asyncio as aioredis
 
@@ -42,7 +42,7 @@ class SessionService:
         if not raw:
             return []
         try:
-            return json.loads(raw)
+            return cast(list[dict[str, Any]], json.loads(raw))
         except (json.JSONDecodeError, TypeError):
             logger.warning("session.corrupt", session_id=session_id)
             return []

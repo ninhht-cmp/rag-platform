@@ -6,6 +6,8 @@ Admin analytics endpoints.
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.v1.middleware.auth import require_roles
@@ -25,7 +27,7 @@ async def get_stats(
     use_case_id: str | None = None,
     days: int = 7,
     _: object = Depends(_admin_required),  # noqa: B008
-) -> dict:
+) -> dict[str, Any]:
     """
     Returns query volume, avg confidence, escalation rate, and token usage per use case.
     Queries real DB; falls back to empty stats if DB is unavailable.

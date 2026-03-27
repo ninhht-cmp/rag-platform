@@ -9,6 +9,9 @@ JWT authentication middleware.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
@@ -71,7 +74,7 @@ async def get_current_user(
     )
 
 
-def require_roles(*roles: Role) -> User:
+def require_roles(*roles: Role) -> Callable[..., Any]:
     """Dependency factory: check user has at least one of the required roles."""
 
     async def _check(user: User = Depends(get_current_user)) -> User:  # noqa: B008
@@ -82,4 +85,4 @@ def require_roles(*roles: Role) -> User:
             )
         return user
 
-    return _check  # type: ignore[return-value]
+    return _check

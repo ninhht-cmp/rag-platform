@@ -122,7 +122,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         decode_responses=False,
         max_connections=20,
     )
-    await _redis.ping()
+    await _redis.ping()  # type: ignore[misc]
     logger.info("app.redis.connected")
 
     # 4. Wire budget guard into LLM service

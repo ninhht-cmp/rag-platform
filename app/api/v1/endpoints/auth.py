@@ -10,6 +10,7 @@ Authentication endpoints.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -62,7 +63,7 @@ def _create_token(
         "exp": int(exp.timestamp()),
         "iat": int(datetime.now(UTC).timestamp()),
     }
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return str(jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM))
 
 
 def _authenticate(email: str, password: str) -> tuple[str, list[str], str] | None:
@@ -121,7 +122,7 @@ async def login(
 
 
 @router.get("/me", summary="Get current user info")
-async def me(user: User = Depends(get_current_user)) -> dict:  # noqa: B008
+async def me(user: User = Depends(get_current_user)) -> dict[str, Any]:  # noqa: B008
     return {
         "id": str(user.id),
         "email": user.email,

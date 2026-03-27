@@ -11,6 +11,8 @@ FIXES applied:
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
@@ -64,7 +66,7 @@ async def readiness() -> HealthStatus:
     # Check Qdrant
     try:
         vs = get_vector_store()
-        ok = await vs.health_check()
+        ok: bool = await vs.health_check()  # type: ignore[misc]
         components["qdrant"] = "healthy" if ok else "unhealthy"
         if not ok:
             overall = "degraded"
@@ -77,7 +79,7 @@ async def readiness() -> HealthStatus:
         from app.main import get_redis
 
         r = get_redis()
-        await r.ping()
+        await r.ping()  # type: ignore[misc]
         components["redis"] = "healthy"
     except Exception as exc:
         components["redis"] = f"error: {type(exc).__name__}"
@@ -110,7 +112,7 @@ async def readiness() -> HealthStatus:
     summary="List registered plugins",
     dependencies=[Depends(require_roles(Role.ADMIN))],  # noqa: B008
 )
-async def list_plugins() -> dict:
+async def list_plugins() -> dict[str, Any]:
     plugins = registry.get_active()
     return {
         "total": len(plugins),

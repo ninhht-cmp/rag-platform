@@ -9,7 +9,7 @@ Document ingestion endpoints.
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 
@@ -136,7 +136,7 @@ async def delete_document(
 async def list_documents(
     use_case_id: str | None = None,
     user: User = Depends(get_current_user),  # noqa: B008
-) -> dict:
+) -> dict[str, Any]:
     """
     List documents the current user has uploaded.
     Optionally filter by use_case_id.

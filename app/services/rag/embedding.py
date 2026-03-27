@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+from collections.abc import Callable
 from functools import lru_cache
 from typing import Any
 
@@ -26,6 +27,20 @@ from app.core.config import settings
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def _make_encode_fn(model: Any, batch: list[str]) -> Callable[[], np.ndarray]:
+    """Return a callable for run_in_executor — avoids lambda type inference issues."""
+
+    def _encode() -> np.ndarray:
+        result: np.ndarray = model.encode(
+            batch,
+            normalize_embeddings=True,
+            show_progress_bar=False,
+        )
+        return result
+
+    return _encode
 
 
 class EmbeddingService:
@@ -82,7 +97,7 @@ class EmbeddingService:
         Returns None (instead of raising) if torch/sentence-transformers unavailable.
         """
         try:
-            from sentence_transformers import SentenceTransformer  # type: ignore[import]
+            from sentence_transformers import SentenceTransformer
 
             return SentenceTransformer(
                 settings.EMBEDDING_MODEL,
@@ -129,15 +144,11 @@ class EmbeddingService:
 
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
-            embeddings: np.ndarray = await loop.run_in_executor(
+            batch_result: np.ndarray = await loop.run_in_executor(
                 None,
-                lambda b=batch: model.encode(
-                    b,
-                    normalize_embeddings=True,
-                    show_progress_bar=False,
-                ),
+                _make_encode_fn(model, batch),
             )
-            all_embeddings.extend(embeddings.tolist())
+            all_embeddings.extend(batch_result.tolist())
 
         logger.debug(
             "embedding.computed",
@@ -149,7 +160,7 @@ class EmbeddingService:
 
     async def embed_query(self, query: str) -> list[float]:
         """Embed a single query string."""
-        results = await self.embed_texts([query])
+        results: list[list[float]] = await self.embed_texts([query])
         return results[0]
 
     @staticmethod

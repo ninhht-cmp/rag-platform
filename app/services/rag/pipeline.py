@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import Any
 
 import redis.asyncio as aioredis
 
@@ -58,7 +59,7 @@ def _sanitize_query(query: str) -> str:
 
 class CrossEncoderReranker:
     def __init__(self) -> None:
-        self._model: object | None = None
+        self._model: Any | None = None
 
     async def rerank(
         self,
@@ -71,7 +72,7 @@ class CrossEncoderReranker:
         try:
             import asyncio
 
-            from sentence_transformers import CrossEncoder  # type: ignore[import]
+            from sentence_transformers import CrossEncoder
 
             if self._model is None:
                 loop = asyncio.get_running_loop()
@@ -80,10 +81,12 @@ class CrossEncoderReranker:
                 )
             pairs = [(query, c.content) for c in chunks]
             loop = asyncio.get_running_loop()
-            scores: list[float] = await loop.run_in_executor(
-                None,
-                lambda p=pairs: self._model.predict(p).tolist(),  # type: ignore[union-attr]
-            )
+            model_ref = self._model
+
+            def _predict(p: list[tuple[str, str]]) -> list[float]:
+                return list(model_ref.predict(p).tolist())  # type: ignore[union-attr]
+
+            scores: list[float] = await loop.run_in_executor(None, lambda: _predict(pairs))
             for chunk, score in zip(chunks, scores, strict=True):
                 chunk.score = float(score)
             chunks.sort(key=lambda c: c.score, reverse=True)

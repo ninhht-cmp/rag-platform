@@ -17,6 +17,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
+from pydantic import SecretStr
 from typing_extensions import TypedDict
 
 from app.core.config import settings
@@ -33,7 +34,7 @@ logger = get_logger(__name__)
 
 
 class AgentState(TypedDict):
-    messages: Annotated[list, add_messages]
+    messages: Annotated[list[Any], add_messages]
     use_case_id: str
     user_id: str
     session_id: str | None
@@ -58,7 +59,7 @@ class AgentService:
     def _get_model(self, tools: list[Any]) -> Any:
         if self._model is None:
             self._model = ChatAnthropic(  # type: ignore[call-arg]
-                api_key=settings.ANTHROPIC_API_KEY,
+                api_key=SecretStr(settings.ANTHROPIC_API_KEY),
                 model=settings.LLM_MODEL_PRIMARY,
                 max_tokens=settings.LLM_MAX_TOKENS,
                 temperature=settings.LLM_TEMPERATURE,
@@ -70,17 +71,17 @@ class AgentService:
         model_with_tools = self._get_model(tools)
         tool_map = {t.name: t for t in tools}
 
-        def call_model(state: AgentState) -> dict:
+        def call_model(state: AgentState) -> dict[str, Any]:
             response = asyncio.get_event_loop().run_until_complete(
                 model_with_tools.ainvoke(state["messages"])
             )
             return {"messages": [response]}
 
-        async def call_model_async(state: AgentState) -> dict:
+        async def call_model_async(state: AgentState) -> dict[str, Any]:
             response = await model_with_tools.ainvoke(state["messages"])
             return {"messages": [response]}
 
-        async def call_tools(state: AgentState) -> dict:
+        async def call_tools(state: AgentState) -> dict[str, Any]:
             last_message = state["messages"][-1]
             tool_calls_count = state.get("tool_calls_count", 0)
 
@@ -125,7 +126,7 @@ class AgentService:
                 "tool_calls_count": tool_calls_count + len(last_message.tool_calls),
             }
 
-        def should_continue(state: AgentState) -> str:
+        def should_continue(state: AgentState) -> Any:
             last_message = state["messages"][-1]
             if hasattr(last_message, "tool_calls") and last_message.tool_calls:
                 if state.get("tool_calls_count", 0) >= self.MAX_TOOL_CALLS:

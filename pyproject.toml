@@ -126,6 +126,10 @@ ignore = ["ANN401"]
 python_version = "3.12"
 strict = true
 ignore_missing_imports = true
+# FastAPI @router decorators, langchain @tool, and tenacity @retry are untyped
+# in their stubs — suppressing avoids 22 noisy false-positives without hiding
+# real type errors in application code.
+disable_error_code = ["untyped-decorator", "unused-ignore"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
