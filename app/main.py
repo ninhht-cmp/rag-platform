@@ -10,18 +10,20 @@ from __future__ import annotations
 
 import time
 import uuid
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import RequestResponseEndpoint
 
 from app.api.v1.endpoints import analytics, auth, health, ingestion, query
 from app.api.v1.middleware.rate_limiter import RateLimiterMiddleware
 from app.core.config import settings
 from app.core.logging import get_logger, setup_logging
+from app.models.domain import QueryResponse
 from app.plugins import register_all_plugins
 from app.services.rag.vector_store import get_vector_store
 
@@ -76,7 +78,7 @@ async def _budget_checker(use_case_id: str) -> None:
 
 
 # ── Query audit log callback ───────────────────────────────────────
-async def _query_log_callback(response: object, user_id: str) -> None:
+async def _query_log_callback(response: QueryResponse, user_id: str) -> None:
     """
     FIX: Persist every query to query_logs table.
     Called by RAGPipeline after each successful query.
@@ -86,7 +88,7 @@ async def _query_log_callback(response: object, user_id: str) -> None:
     try:
         async with get_session_factory()() as session:
             repo = QueryLogRepository(session)
-            await repo.log(response, user_id)  # type: ignore[arg-type]
+            await repo.log(response, user_id)
     except Exception as exc:
         logger.error("query_log.persist.failed", error=str(exc))
 
@@ -169,7 +171,7 @@ def create_app() -> FastAPI:
     app.add_middleware(RateLimiterMiddleware, redis_client=None)
 
     @app.middleware("http")
-    async def request_middleware(request: Request, call_next: Callable) -> Response:  # type: ignore[type-arg]
+    async def request_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
         request_id = request.headers.get("X-Request-ID", str(uuid.uuid4())[:8])
         start = time.monotonic()
         response: Response = await call_next(request)

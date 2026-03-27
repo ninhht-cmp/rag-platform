@@ -51,5 +51,5 @@ def setup_logging() -> None:
         logging.getLogger(noisy_lib).setLevel(logging.WARNING)
 
 
-def get_logger(name: str) -> structlog.BoundLogger:
-    return structlog.get_logger(name)
+def get_logger(name: str) -> structlog.stdlib.BoundLogger:
+    return structlog.get_logger(name)  # type: ignore[return-value]

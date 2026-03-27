@@ -41,7 +41,7 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 async def upload_document(
     use_case_id: Annotated[str, Form()],
     file: Annotated[UploadFile, File()],
-    user: User = Depends(get_current_user),  # noqa: B008
+    user: Annotated[User, Depends(get_current_user)],
 ) -> IngestionResult:
     """
     Upload a document for ingestion into the specified use case.
@@ -116,7 +116,7 @@ async def upload_document(
 async def delete_document(
     document_id: str,
     use_case_id: str,
-    user: User = Depends(require_roles(Role.ADMIN, Role.ANALYST)),  # noqa: B008
+    user: Annotated[User, Depends(require_roles(Role.ADMIN, Role.ANALYST))],
 ) -> None:
     """Remove all chunks of a document from the vector index."""
     svc = get_ingestion_service()
@@ -135,8 +135,8 @@ async def delete_document(
 )
 async def list_documents(
     use_case_id: str | None = None,
-    user: User = Depends(get_current_user),  # noqa: B008
-) -> dict:
+    user: Annotated[User, Depends(get_current_user)] = None,  # type: ignore[assignment]
+) -> dict[str, object]:
     """
     List documents the current user has uploaded.
     Optionally filter by use_case_id.

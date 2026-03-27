@@ -20,6 +20,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.core.config import LLMProvider, settings
@@ -68,8 +69,8 @@ class LLMService:
         self._budget_checker = checker
 
     def _build_anthropic(self, model: str) -> ChatAnthropic:
-        return ChatAnthropic(  # type: ignore[call-arg]
-            api_key=settings.ANTHROPIC_API_KEY,
+        return ChatAnthropic(
+            api_key=SecretStr(settings.ANTHROPIC_API_KEY),
             model=model,
             max_tokens=settings.LLM_MAX_TOKENS,
             temperature=settings.LLM_TEMPERATURE,
@@ -77,9 +78,9 @@ class LLMService:
 
     def _build_openai(self, model: str = "gpt-4o-mini") -> ChatOpenAI:
         return ChatOpenAI(
-            api_key=settings.OPENAI_API_KEY,
+            api_key=SecretStr(str(settings.OPENAI_API_KEY)),
             model=model,
-            max_tokens=settings.LLM_MAX_TOKENS,
+            max_completion_tokens=settings.LLM_MAX_TOKENS,
             temperature=settings.LLM_TEMPERATURE,
         )
 

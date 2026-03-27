@@ -17,7 +17,7 @@ from functools import lru_cache
 import redis.asyncio as aioredis
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from app.core.logging import get_logger
 
@@ -66,9 +66,9 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         except Exception as exc:
             raise RuntimeError("Redis not available") from exc
 
-    async def dispatch(self, request: Request, call_next: object) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         if request.url.path in ("/health", "/health/ready"):
-            return await call_next(request)  # type: ignore[misc]
+            return await call_next(request)
 
         identity, tier = self._get_identity(request)
         max_reqs, window_secs = _LIMITS[tier]
@@ -77,10 +77,10 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             _ = self._get_redis()
             allowed, remaining = await self._check(identity, tier, max_reqs, window_secs)
         except RuntimeError:
-            return await call_next(request)  # type: ignore[misc]
+            return await call_next(request)
         except Exception as exc:
             logger.warning("rate_limiter.redis_error", error=str(exc))
-            return await call_next(request)  # type: ignore[misc]
+            return await call_next(request)
 
         if not allowed:
             logger.warning(
@@ -99,7 +99,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             response.headers["Retry-After"] = str(window_secs)
             return response
 
-        response = await call_next(request)  # type: ignore[misc]
+        response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(max_reqs)
         response.headers["X-RateLimit-Remaining"] = str(remaining)
         response.headers["X-RateLimit-Window"] = str(window_secs)

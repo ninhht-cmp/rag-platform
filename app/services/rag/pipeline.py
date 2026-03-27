@@ -80,10 +80,14 @@ class CrossEncoderReranker:
                 )
             pairs = [(query, c.content) for c in chunks]
             loop = asyncio.get_running_loop()
-            scores: list[float] = await loop.run_in_executor(
-                None,
-                lambda p=pairs: self._model.predict(p).tolist(),  # type: ignore[union-attr]
-            )
+
+            def _predict(p: list[tuple[str, str]]) -> list[float]:
+                model = self._model
+                assert model is not None  # guarded by if self._model is None above
+                raw = model.predict(p)  # type: ignore[union-attr]
+                return raw.tolist()  # type: ignore[union-attr]
+
+            scores: list[float] = await loop.run_in_executor(None, lambda p=pairs: _predict(p))
             for chunk, score in zip(chunks, scores, strict=True):
                 chunk.score = float(score)
             chunks.sort(key=lambda c: c.score, reverse=True)

@@ -6,6 +6,8 @@ Admin analytics endpoints.
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.v1.middleware.auth import require_roles
@@ -24,8 +26,8 @@ _admin_required = require_roles(Role.ADMIN)
 async def get_stats(
     use_case_id: str | None = None,
     days: int = 7,
-    _: object = Depends(_admin_required),  # noqa: B008
-) -> dict:
+    _: Annotated[object, Depends(_admin_required)] = None,  # noqa: B008
+) -> dict[str, object]:
     """
     Returns query volume, avg confidence, escalation rate, and token usage per use case.
     Queries real DB; falls back to empty stats if DB is unavailable.
@@ -67,7 +69,7 @@ async def get_stats(
 )
 async def get_eval_results(
     use_case_id: str,
-    _: object = Depends(_admin_required),  # noqa: B008
+    _: Annotated[object, Depends(_admin_required)] = None,  # noqa: B008
 ) -> EvalMetrics | None:
     if registry.get(use_case_id) is None:
         raise HTTPException(status_code=404, detail=f"Use case '{use_case_id}' not found")
@@ -90,7 +92,7 @@ async def get_eval_results(
 )
 async def trigger_eval(
     use_case_id: str,
-    _: object = Depends(_admin_required),  # noqa: B008
+    _: Annotated[object, Depends(_admin_required)] = None,  # noqa: B008
 ) -> EvalMetrics:
     if registry.get(use_case_id) is None:
         raise HTTPException(status_code=404, detail=f"Use case '{use_case_id}' not found")
