@@ -4,6 +4,7 @@ app/utils/helpers.py
 Shared utility functions.
 Keep this thin — if a helper grows complex, move it to a dedicated service.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -18,6 +19,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 # ── ID / hashing ──────────────────────────────────────────────────
 
+
 def new_id() -> str:
     """Generate a compact unique ID (no dashes)."""
     return uuid.uuid4().hex
@@ -29,6 +31,7 @@ def stable_hash(text: str, length: int = 16) -> str:
 
 
 # ── Text utilities ────────────────────────────────────────────────
+
 
 def truncate(text: str, max_len: int = 200, suffix: str = "...") -> str:
     """Truncate text to max_len chars, appending suffix if truncated."""
@@ -80,13 +83,11 @@ def estimate_cost_usd(
 ) -> float:
     """Estimate API cost in USD for a request."""
     costs = _TOKEN_COSTS.get(model, {"input": 3.0, "output": 15.0})
-    return (
-        input_tokens * costs["input"] / 1_000_000
-        + output_tokens * costs["output"] / 1_000_000
-    )
+    return input_tokens * costs["input"] / 1_000_000 + output_tokens * costs["output"] / 1_000_000
 
 
 # ── Timing ────────────────────────────────────────────────────────
+
 
 class Timer:
     """Context manager for measuring elapsed time in ms."""
@@ -104,6 +105,7 @@ class Timer:
 
 
 # ── Validation helpers ────────────────────────────────────────────
+
 
 def is_valid_email(email: str) -> bool:
     return bool(re.match(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$", email))
@@ -125,6 +127,7 @@ def sanitize_filename(filename: str) -> str:
 
 
 # ── Response helpers ──────────────────────────────────────────────
+
 
 def paginate(
     items: list[Any],

@@ -6,6 +6,7 @@ Authentication endpoints.
 - POST /auth/refresh — exchange refresh token for new access token
 - GET  /auth/me      — current user info
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -31,11 +32,11 @@ _pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # Passwords are bcrypt-hashed.  Regenerate with:
 #   python -c "from passlib.context import CryptContext; print(CryptContext(['bcrypt']).hash('pw'))"
 _DEMO_USERS: dict[str, tuple[str, list[str], str]] = {
-    "admin@company.com":   (_pwd_ctx.hash("admin123"),   ["admin"],         "Engineering"),
-    "user@company.com":    (_pwd_ctx.hash("user123"),    ["user"],          "General"),
+    "admin@company.com": (_pwd_ctx.hash("admin123"), ["admin"], "Engineering"),
+    "user@company.com": (_pwd_ctx.hash("user123"), ["user"], "General"),
     "support@company.com": (_pwd_ctx.hash("support123"), ["support_agent"], "Customer Success"),
-    "sales@company.com":   (_pwd_ctx.hash("sales123"),   ["sales_rep"],     "Sales"),
-    "analyst@company.com": (_pwd_ctx.hash("analyst123"), ["analyst"],       "Finance"),
+    "sales@company.com": (_pwd_ctx.hash("sales123"), ["sales_rep"], "Sales"),
+    "analyst@company.com": (_pwd_ctx.hash("analyst123"), ["analyst"], "Finance"),
 }
 
 

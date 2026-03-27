@@ -4,6 +4,7 @@ tests/conftest.py
 Shared pytest fixtures.
 Patches heavy dependencies at session level so tests stay fast.
 """
+
 from __future__ import annotations
 
 import os
@@ -27,6 +28,7 @@ os.environ.setdefault(
 def register_plugins_once() -> None:
     """Register all plugins once per test session. Idempotent."""
     from app.plugins import register_all_plugins
+
     register_all_plugins()
 
 
@@ -46,6 +48,7 @@ def mock_redis(monkeypatch: pytest.MonkeyPatch) -> mock.AsyncMock:
 def mock_qdrant_startup(monkeypatch: pytest.MonkeyPatch) -> None:
     """Prevent real Qdrant connections during app startup."""
     from app.services.rag import vector_store as vs_module
+
     with (
         mock.patch.object(vs_module.VectorStore, "startup", mock.AsyncMock()),
         mock.patch.object(vs_module.VectorStore, "shutdown", mock.AsyncMock()),

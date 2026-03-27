@@ -9,6 +9,7 @@ Usage:
     python scripts/smoke_test.py
     python scripts/smoke_test.py --base-url http://staging.api.internal:8000
 """
+
 import argparse
 import sys
 
@@ -46,50 +47,73 @@ def run(base_url: str) -> bool:
             data={"username": "user@company.com", "password": "user123"},
         )
         check("POST /auth/token (user)", token_resp)
-        user_token = token_resp.json().get("access_token", "") if token_resp.status_code == 200 else ""
+        user_token = (
+            token_resp.json().get("access_token", "") if token_resp.status_code == 200 else ""
+        )
 
         admin_token_resp = client.post(
             "/api/v1/auth/token",
             data={"username": "admin@company.com", "password": "admin123"},
         )
         check("POST /auth/token (admin)", admin_token_resp)
-        admin_token = admin_token_resp.json().get("access_token", "") if admin_token_resp.status_code == 200 else ""
+        admin_token = (
+            admin_token_resp.json().get("access_token", "")
+            if admin_token_resp.status_code == 200
+            else ""
+        )
 
         if user_token:
-            check("GET /auth/me", client.get(
-                "/api/v1/auth/me",
-                headers={"Authorization": f"Bearer {user_token}"},
-            ))
+            check(
+                "GET /auth/me",
+                client.get(
+                    "/api/v1/auth/me",
+                    headers={"Authorization": f"Bearer {user_token}"},
+                ),
+            )
 
         # 3. Query endpoint
         print("\n[3] Query")
         if user_token:
-            check("POST /query (no auth) → 401", client.post(
-                "/api/v1/query",
-                json={"query": "test"},
-            ), expected_status=401)
+            check(
+                "POST /query (no auth) → 401",
+                client.post(
+                    "/api/v1/query",
+                    json={"query": "test"},
+                ),
+                expected_status=401,
+            )
 
-            check("POST /query (authed)", client.post(
-                "/api/v1/query",
-                json={"query": "What is the company vacation policy?"},
-                headers={"Authorization": f"Bearer {user_token}"},
-            ))
+            check(
+                "POST /query (authed)",
+                client.post(
+                    "/api/v1/query",
+                    json={"query": "What is the company vacation policy?"},
+                    headers={"Authorization": f"Bearer {user_token}"},
+                ),
+            )
 
         # 4. Admin
         print("\n[4] Admin")
         if admin_token:
-            check("GET /admin/plugins", client.get(
-                "/admin/plugins",
-                headers={"Authorization": f"Bearer {admin_token}"},
-            ))
+            check(
+                "GET /admin/plugins",
+                client.get(
+                    "/admin/plugins",
+                    headers={"Authorization": f"Bearer {admin_token}"},
+                ),
+            )
 
         # 5. RBAC check
         print("\n[5] RBAC")
         if user_token:
-            check("GET /admin/plugins (user) → 403", client.get(
-                "/admin/plugins",
-                headers={"Authorization": f"Bearer {user_token}"},
-            ), expected_status=403)
+            check(
+                "GET /admin/plugins (user) → 403",
+                client.get(
+                    "/admin/plugins",
+                    headers={"Authorization": f"Bearer {user_token}"},
+                ),
+                expected_status=403,
+            )
 
     print(f"\nResults: {passed} passed, {failed} failed")
     return failed == 0

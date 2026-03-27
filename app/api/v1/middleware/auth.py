@@ -6,6 +6,7 @@ JWT authentication middleware.
 - Role extraction
 - User context injection via request.state
 """
+
 from __future__ import annotations
 
 from fastapi import Depends, HTTPException, Security, status
@@ -56,6 +57,7 @@ async def get_current_user(
         )
     payload = _decode_token(credentials.credentials)
     import uuid as _uuid
+
     try:
         user_id = _uuid.UUID(payload.sub)
     except (ValueError, AttributeError):
@@ -71,6 +73,7 @@ async def get_current_user(
 
 def require_roles(*roles: Role) -> User:
     """Dependency factory: check user has at least one of the required roles."""
+
     async def _check(user: User = Depends(get_current_user)) -> User:  # noqa: B008
         if not any(r in user.roles for r in roles):
             raise HTTPException(
@@ -78,4 +81,5 @@ def require_roles(*roles: Role) -> User:
                 detail=f"Required roles: {[r.value for r in roles]}",
             )
         return user
+
     return _check  # type: ignore[return-value]

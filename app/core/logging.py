@@ -4,6 +4,7 @@ app/core/logging.py
 Structured logging with structlog.
 JSON in production, colored console in local dev.
 """
+
 from __future__ import annotations
 
 import logging

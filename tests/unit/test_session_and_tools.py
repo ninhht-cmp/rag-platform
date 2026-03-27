@@ -6,6 +6,7 @@ Unit tests for:
 - Agent tools (stubs validation)
 - Helpers (text utils, cost estimation)
 """
+
 from __future__ import annotations
 
 import json
@@ -26,6 +27,7 @@ from app.utils.helpers import (
 )
 
 # ── Session Service tests ─────────────────────────────────────────
+
 
 class TestSessionService:
     @pytest.fixture
@@ -116,9 +118,7 @@ class TestSessionService:
         assert history == []
 
     @pytest.mark.asyncio
-    async def test_session_key_format(
-        self, session: SessionService, redis_mock: AsyncMock
-    ) -> None:
+    async def test_session_key_format(self, session: SessionService, redis_mock: AsyncMock) -> None:
         await session.append("my_session_123", "user", "test")
         call_args = redis_mock.set.call_args
         key = call_args[0][0]
@@ -127,21 +127,26 @@ class TestSessionService:
 
 # ── Agent Tools tests ─────────────────────────────────────────────
 
+
 class TestAgentTools:
     @pytest.mark.asyncio
     async def test_create_ticket_returns_ticket_id(self) -> None:
         from app.services.agent.tools import create_support_ticket
-        result = await create_support_ticket.ainvoke({
-            "subject": "Login issue",
-            "description": "Cannot log in",
-            "priority": "high",
-        })
+
+        result = await create_support_ticket.ainvoke(
+            {
+                "subject": "Login issue",
+                "description": "Cannot log in",
+                "priority": "high",
+            }
+        )
         assert "TKT-" in result
         assert "high" in result.lower()
 
     @pytest.mark.asyncio
     async def test_lookup_order_returns_status(self) -> None:
         from app.services.agent.tools import lookup_order_status
+
         result = await lookup_order_status.ainvoke({"order_id": "ORD-12345"})
         assert "ORD-12345" in result
         assert "Status" in result
@@ -149,12 +154,15 @@ class TestAgentTools:
     @pytest.mark.asyncio
     async def test_draft_email_contains_review_warning(self) -> None:
         from app.services.agent.tools import draft_outreach_email
-        result = await draft_outreach_email.ainvoke({
-            "prospect_name": "Jane Smith",
-            "company_name": "Acme Corp",
-            "pain_point": "slow onboarding",
-            "product_value_prop": "automated onboarding",
-        })
+
+        result = await draft_outreach_email.ainvoke(
+            {
+                "prospect_name": "Jane Smith",
+                "company_name": "Acme Corp",
+                "pain_point": "slow onboarding",
+                "product_value_prop": "automated onboarding",
+            }
+        )
         assert "REQUIRES HUMAN REVIEW" in result
         assert "Jane Smith" in result
         assert "Acme Corp" in result
@@ -162,34 +170,46 @@ class TestAgentTools:
     @pytest.mark.asyncio
     async def test_crm_activity_log_succeeds(self) -> None:
         from app.services.agent.tools import create_crm_activity
-        result = await create_crm_activity.ainvoke({
-            "company_name": "TestCo",
-            "activity_type": "call",
-            "notes": "Discussed pricing",
-        })
+
+        result = await create_crm_activity.ainvoke(
+            {
+                "company_name": "TestCo",
+                "activity_type": "call",
+                "notes": "Discussed pricing",
+            }
+        )
         assert "ACT-" in result
         assert "call" in result.lower()
 
     def test_tool_registry_has_all_tools(self) -> None:
         from app.services.agent.tools import TOOL_REGISTRY
+
         expected = {
-            "create_ticket", "lookup_order", "check_account_status",
-            "web_search", "crm_lookup", "draft_email", "create_crm_activity",
+            "create_ticket",
+            "lookup_order",
+            "check_account_status",
+            "web_search",
+            "crm_lookup",
+            "draft_email",
+            "create_crm_activity",
         }
         assert set(TOOL_REGISTRY.keys()) == expected
 
     def test_get_tools_for_plugin_returns_subset(self) -> None:
         from app.services.agent.tools import get_tools_for_plugin
+
         tools = get_tools_for_plugin(["create_ticket", "lookup_order"])
         assert len(tools) == 2
 
     def test_get_tools_unknown_id_skipped(self) -> None:
         from app.services.agent.tools import get_tools_for_plugin
+
         tools = get_tools_for_plugin(["create_ticket", "nonexistent_tool"])
         assert len(tools) == 1  # only the valid one
 
 
 # ── Helpers tests ─────────────────────────────────────────────────
+
 
 class TestHelpers:
     def test_truncate_short_text_unchanged(self) -> None:
@@ -248,7 +268,7 @@ class TestHelpers:
     def test_estimate_cost_usd(self) -> None:
         # 1M input + 500K output tokens on Sonnet
         cost = estimate_cost_usd("claude-sonnet-4-6", 1_000_000, 500_000)
-        expected = 3.0 + (15.0 * 0.5)   # = 10.5 USD
+        expected = 3.0 + (15.0 * 0.5)  # = 10.5 USD
         assert abs(cost - expected) < 0.01
 
     def test_estimate_cost_unknown_model_uses_default(self) -> None:

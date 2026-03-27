@@ -3,6 +3,7 @@ app/repositories/document_repository.py
 ─────────────────────────────────────────
 PostgreSQL repository for document metadata and query audit logs.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -57,6 +58,7 @@ async def get_db_session() -> AsyncSession:
 
 
 # ── Document Repository ───────────────────────────────────────────
+
 
 class DocumentRepository:
     def __init__(self, session: AsyncSession) -> None:
@@ -145,12 +147,14 @@ class DocumentRepository:
 
 # ── Query Log Repository ──────────────────────────────────────────
 
+
 class QueryLogRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._s = session
 
     async def log(self, response: QueryResponse, user_id: str) -> None:
         import orjson
+
         await self._s.execute(
             text("""
                 INSERT INTO query_logs
@@ -209,6 +213,7 @@ class QueryLogRepository:
 
 # ── Token Usage Repository ────────────────────────────────────────
 
+
 class TokenUsageRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._s = session
@@ -252,6 +257,7 @@ class TokenUsageRepository:
 
 
 # ── Eval Repository ───────────────────────────────────────────────
+
 
 class EvalRepository:
     def __init__(self, session: AsyncSession) -> None:

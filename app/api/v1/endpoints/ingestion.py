@@ -5,6 +5,7 @@ Document ingestion endpoints.
 - POST /ingest/upload   — upload file for indexing
 - DELETE /ingest/{id}   — remove document from index
 """
+
 from __future__ import annotations
 
 import uuid

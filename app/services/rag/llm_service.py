@@ -7,6 +7,7 @@ LLM abstraction with:
 - Token usage tracking & budget guard  ← FIX: budget now enforced
 - Prompt templating with Jinja2
 """
+
 from __future__ import annotations
 
 import time
@@ -110,9 +111,7 @@ class LLMService:
 
     def _default_rag_prompt(self, context: dict[str, Any]) -> str:
         chunks: list[DocumentChunk] = context.get("chunks", [])
-        ctx_text = "\n\n".join(
-            f"[Source {i+1}] {c.content}" for i, c in enumerate(chunks)
-        )
+        ctx_text = "\n\n".join(f"[Source {i + 1}] {c.content}" for i, c in enumerate(chunks))
         return f"""You are a helpful AI assistant. Answer based ONLY on the provided context.
 If the answer is not in the context, say \
 "I don't have information about this in the available documents."
@@ -121,7 +120,7 @@ Always cite sources using [Source N] notation.
 Context:
 {ctx_text}
 
-Question: {context.get('query', '')}
+Question: {context.get("query", "")}
 
 Answer:"""
 
@@ -138,6 +137,7 @@ Answer:"""
             # Re-raise HTTP 429 as-is; swallow unexpected errors so budget
             # check failure doesn't block all requests if DB is down.
             from fastapi import HTTPException
+
             if isinstance(exc, HTTPException):
                 raise
             logger.error("budget.check.error", error=str(exc))

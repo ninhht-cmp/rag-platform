@@ -4,6 +4,7 @@ app/services/rag/pipeline.py
 Core RAG pipeline.
 Flow: Query → Intent route → Retrieve → Rerank → Generate → Cite
 """
+
 from __future__ import annotations
 
 import time
@@ -43,6 +44,7 @@ _INJECTION_PATTERNS = [
 
 def _sanitize_query(query: str) -> str:
     import re
+
     lower = query.lower()
     for pattern in _INJECTION_PATTERNS:
         if re.search(pattern, lower, re.IGNORECASE):
@@ -52,6 +54,7 @@ def _sanitize_query(query: str) -> str:
 
 
 # ── Reranker ──────────────────────────────────────────────────────
+
 
 class CrossEncoderReranker:
     def __init__(self) -> None:
@@ -69,6 +72,7 @@ class CrossEncoderReranker:
             import asyncio
 
             from sentence_transformers import CrossEncoder  # type: ignore[import]
+
             if self._model is None:
                 loop = asyncio.get_running_loop()
                 self._model = await loop.run_in_executor(
@@ -77,7 +81,8 @@ class CrossEncoderReranker:
             pairs = [(query, c.content) for c in chunks]
             loop = asyncio.get_running_loop()
             scores: list[float] = await loop.run_in_executor(
-                None, lambda p=pairs: self._model.predict(p).tolist()  # type: ignore[union-attr]
+                None,
+                lambda p=pairs: self._model.predict(p).tolist(),  # type: ignore[union-attr]
             )
             for chunk, score in zip(chunks, scores, strict=True):
                 chunk.score = float(score)
@@ -93,17 +98,20 @@ _reranker = CrossEncoderReranker()
 
 # ── Semantic cache ────────────────────────────────────────────────
 
+
 class SemanticCache:
     def __init__(self, redis_client: aioredis.Redis) -> None:  # type: ignore[type-arg]
         self._r = redis_client
 
     def _key(self, query: str, plugin_id: str, rbac_context: str = "") -> str:
         from app.services.rag.embedding import EmbeddingService
+
         h = EmbeddingService.text_hash(f"{plugin_id}:{rbac_context}:{query.lower().strip()}")
         return f"sem_cache:{h}"
 
     async def get(self, query: str, plugin_id: str, rbac_context: str = "") -> QueryResponse | None:
         import orjson
+
         key = self._key(query, plugin_id, rbac_context)
         try:
             data = await self._r.get(key)
@@ -123,6 +131,7 @@ class SemanticCache:
         rbac_context: str = "",
     ) -> None:
         import orjson
+
         key = self._key(query, plugin_id, rbac_context)
         try:
             await self._r.set(
@@ -223,6 +232,7 @@ class RAGPipeline:
         # Check escalation pattern FIRST (more important)
         if plugin.escalation_pattern:
             import re
+
             if re.search(plugin.escalation_pattern, query, re.IGNORECASE):
                 return True, "Query matches escalation pattern"
 
@@ -348,6 +358,7 @@ class RAGPipeline:
 
         try:
             from app.utils.helpers import estimate_cost_usd
+
             cost = estimate_cost_usd(
                 settings.LLM_MODEL_PRIMARY,
                 token_usage.get("input_tokens", 0),
@@ -407,7 +418,7 @@ class RAGPipeline:
         if chunks and cfg.reranker_enabled:
             chunks = await _reranker.rerank(request.query, chunks, cfg.top_k)
         else:
-            chunks = chunks[:cfg.top_k]
+            chunks = chunks[: cfg.top_k]
 
         system_prompt = self._llm.render_prompt(
             template_path=plugin.system_prompt_path,

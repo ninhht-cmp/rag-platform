@@ -12,6 +12,7 @@ Design:
 - TTL: 30 minutes (reset on each interaction)
 - Max messages: 20 (sliding window — drop oldest)
 """
+
 from __future__ import annotations
 
 import json
@@ -49,16 +50,18 @@ class SessionService:
     async def append(
         self,
         session_id: str,
-        role: str,        # "user" | "assistant"
+        role: str,  # "user" | "assistant"
         content: str,
     ) -> None:
         """Append a message and reset TTL. Enforces sliding window."""
         history = await self.get_history(session_id)
-        history.append({
-            "role": role,
-            "content": content,
-            "ts": datetime.utcnow().isoformat(),
-        })
+        history.append(
+            {
+                "role": role,
+                "content": content,
+                "ts": datetime.utcnow().isoformat(),
+            }
+        )
 
         # Sliding window — drop oldest if over limit
         if len(history) > MAX_MESSAGES:

@@ -3,6 +3,7 @@ tests/unit/test_auth.py
 ────────────────────────
 Unit tests for JWT auth middleware and token generation.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -109,10 +110,7 @@ class TestRequireRoles:
         from app.api.v1.middleware.auth import require_roles
         from app.models.domain import User
 
-        admin_user = User(
-            id=uuid.uuid4(), email="a@co.com", name="Admin",
-            roles=[Role.ADMIN]
-        )
+        admin_user = User(id=uuid.uuid4(), email="a@co.com", name="Admin", roles=[Role.ADMIN])
         checker = require_roles(Role.ADMIN)
         # Should not raise
         result = await checker(admin_user)
@@ -125,10 +123,7 @@ class TestRequireRoles:
         from app.api.v1.middleware.auth import require_roles
         from app.models.domain import User
 
-        regular_user = User(
-            id=uuid.uuid4(), email="u@co.com", name="User",
-            roles=[Role.USER]
-        )
+        regular_user = User(id=uuid.uuid4(), email="u@co.com", name="User", roles=[Role.USER])
         checker = require_roles(Role.ADMIN)
         with pytest.raises(HTTPException) as exc_info:
             await checker(regular_user)
@@ -141,10 +136,7 @@ class TestRequireRoles:
         from app.api.v1.middleware.auth import require_roles
         from app.models.domain import User
 
-        sales_user = User(
-            id=uuid.uuid4(), email="s@co.com", name="Sales",
-            roles=[Role.SALES_REP]
-        )
+        sales_user = User(id=uuid.uuid4(), email="s@co.com", name="Sales", roles=[Role.SALES_REP])
         # Require admin OR sales_rep — sales_rep should pass
         checker = require_roles(Role.ADMIN, Role.SALES_REP)
         result = await checker(sales_user)

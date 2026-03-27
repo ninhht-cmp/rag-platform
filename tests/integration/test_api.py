@@ -4,6 +4,7 @@ tests/integration/test_api.py
 Integration tests for API endpoints.
 Uses FastAPI TestClient — no real LLM/Qdrant calls.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -30,6 +31,7 @@ def _make_token(roles: list[str] = None, user_id: str = "test_user") -> str:
 @pytest.fixture
 def client() -> TestClient:
     from app.main import app
+
     return TestClient(app, raise_server_exceptions=False)
 
 
@@ -45,6 +47,7 @@ def admin_headers() -> dict[str, str]:
 
 # ── Health endpoints ──────────────────────────────────────────────
 
+
 class TestHealth:
     def test_health_returns_200(self, client: TestClient) -> None:
         resp = client.get("/health")
@@ -59,6 +62,7 @@ class TestHealth:
 
 
 # ── Auth middleware ───────────────────────────────────────────────
+
 
 class TestAuth:
     def test_query_without_token_returns_401(self, client: TestClient) -> None:
@@ -91,6 +95,7 @@ class TestAuth:
 
 # ── Query endpoint ────────────────────────────────────────────────
 
+
 class TestQueryEndpoint:
     def test_query_returns_200_with_valid_token(
         self, client: TestClient, auth_headers: dict
@@ -120,9 +125,7 @@ class TestQueryEndpoint:
         assert data["confidence"] == 0.85
         assert data["escalated"] is False
 
-    def test_query_empty_string_returns_422(
-        self, client: TestClient, auth_headers: dict
-    ) -> None:
+    def test_query_empty_string_returns_422(self, client: TestClient, auth_headers: dict) -> None:
         resp = client.post(
             "/api/v1/query",
             json={"query": ""},
@@ -130,9 +133,7 @@ class TestQueryEndpoint:
         )
         assert resp.status_code == 422
 
-    def test_query_too_long_returns_422(
-        self, client: TestClient, auth_headers: dict
-    ) -> None:
+    def test_query_too_long_returns_422(self, client: TestClient, auth_headers: dict) -> None:
         resp = client.post(
             "/api/v1/query",
             json={"query": "x" * 2001},  # exceeds max_length=2000
@@ -140,9 +141,7 @@ class TestQueryEndpoint:
         )
         assert resp.status_code == 422
 
-    def test_query_with_explicit_use_case_id(
-        self, client: TestClient, auth_headers: dict
-    ) -> None:
+    def test_query_with_explicit_use_case_id(self, client: TestClient, auth_headers: dict) -> None:
         mock_response = QueryResponse(
             query="test",
             answer="Support answer.",
@@ -152,13 +151,16 @@ class TestQueryEndpoint:
         )
 
         # Patch both RAGPipeline and AgentService since customer_support has agent_tools
-        with patch(
-            "app.api.v1.endpoints.query.RAGPipeline.query",
-            new_callable=AsyncMock,
-            return_value=mock_response,
-        ), patch(
-            "app.services.agent.agent_service.AgentService",
-        ) as mock_agent_cls:
+        with (
+            patch(
+                "app.api.v1.endpoints.query.RAGPipeline.query",
+                new_callable=AsyncMock,
+                return_value=mock_response,
+            ),
+            patch(
+                "app.services.agent.agent_service.AgentService",
+            ) as mock_agent_cls,
+        ):
             mock_agent_cls.return_value.run = AsyncMock(return_value=mock_response)
             resp = client.post(
                 "/api/v1/query",
@@ -174,6 +176,7 @@ class TestQueryEndpoint:
 
 
 # ── Ingestion endpoint ────────────────────────────────────────────
+
 
 class TestIngestionEndpoint:
     def test_upload_without_auth_returns_401(self, client: TestClient) -> None:
@@ -195,9 +198,7 @@ class TestIngestionEndpoint:
         )
         assert resp.status_code == 415
 
-    def test_upload_valid_text_file(
-        self, client: TestClient, auth_headers: dict
-    ) -> None:
+    def test_upload_valid_text_file(self, client: TestClient, auth_headers: dict) -> None:
         from app.models.domain import DocumentStatus, IngestionResult
 
         mock_result = IngestionResult(
@@ -207,19 +208,19 @@ class TestIngestionEndpoint:
             processing_time_ms=250,
         )
 
-        with patch(
-            "app.api.v1.endpoints.ingestion.get_ingestion_service"
-        ) as mock_svc:
+        with patch("app.api.v1.endpoints.ingestion.get_ingestion_service") as mock_svc:
             mock_svc.return_value.ingest_document = AsyncMock(return_value=mock_result)
 
             resp = client.post(
                 "/api/v1/ingest/upload",
                 data={"use_case_id": "knowledge_base"},
-                files={"file": (
-                    "policy.txt",
-                    b"Company vacation policy: 15 days per year.",
-                    "text/plain",
-                )},
+                files={
+                    "file": (
+                        "policy.txt",
+                        b"Company vacation policy: 15 days per year.",
+                        "text/plain",
+                    )
+                },
                 headers=auth_headers,
             )
 

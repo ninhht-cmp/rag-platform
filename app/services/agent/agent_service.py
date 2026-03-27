@@ -6,6 +6,7 @@ Used by plugins that have agent_tools configured.
 Supports multi-turn tool use with human-in-the-loop confirmation for
 irreversible actions.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -30,6 +31,7 @@ logger = get_logger(__name__)
 
 # ── Agent State ───────────────────────────────────────────────────
 
+
 class AgentState(TypedDict):
     messages: Annotated[list, add_messages]
     use_case_id: str
@@ -40,6 +42,7 @@ class AgentState(TypedDict):
 
 
 # ── Agent Service ─────────────────────────────────────────────────
+
 
 class AgentService:
     """
@@ -115,9 +118,7 @@ class AgentService:
                             tool=tool_call["name"],
                             error=str(exc),
                         )
-                results.append(
-                    ToolMessage(content=str(result), tool_call_id=tool_call["id"])
-                )
+                results.append(ToolMessage(content=str(result), tool_call_id=tool_call["id"]))
 
             return {
                 "messages": results,
@@ -152,6 +153,7 @@ class AgentService:
         if not tools:
             logger.warning("agent.no_tools", plugin=plugin.id)
             from app.services.rag.pipeline import RAGPipeline
+
             pipeline = RAGPipeline()
             return await pipeline.query(request, user)
 
@@ -160,6 +162,7 @@ class AgentService:
         if request.session_id:
             try:
                 from app.main import get_redis
+
                 session_svc = SessionService(get_redis())
                 session_context = await session_svc.format_for_prompt(request.session_id)
             except Exception as exc:
@@ -184,14 +187,16 @@ class AgentService:
 
         try:
             result = await asyncio.wait_for(
-                graph.ainvoke({
-                    "messages": messages,
-                    "use_case_id": plugin.id,
-                    "user_id": str(user.id),
-                    "session_id": request.session_id,
-                    "tool_calls_count": 0,
-                    "final_answer": None,
-                }),
+                graph.ainvoke(
+                    {
+                        "messages": messages,
+                        "use_case_id": plugin.id,
+                        "user_id": str(user.id),
+                        "session_id": request.session_id,
+                        "tool_calls_count": 0,
+                        "final_answer": None,
+                    }
+                ),
                 timeout=120.0,
             )
         except TimeoutError:
@@ -223,15 +228,14 @@ class AgentService:
                 break
 
         answer = (
-            str(final_message.content)
-            if final_message
-            else "I was unable to generate a response."
+            str(final_message.content) if final_message else "I was unable to generate a response."
         )
 
         # Persist to session if provided
         if request.session_id:
             try:
                 from app.main import get_redis
+
                 session_svc = SessionService(get_redis())
                 await session_svc.append(request.session_id, "user", request.query)
                 await session_svc.append(request.session_id, "assistant", answer)

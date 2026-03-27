@@ -4,6 +4,7 @@ tests/unit/test_pipeline.py
 Unit tests for RAG pipeline and plugin registry.
 All external deps mocked — tests run with no infra.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -28,6 +29,7 @@ from app.models.domain import (
 from app.services.rag.pipeline import RAGPipeline
 
 # ── Fixtures ──────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def sample_plugin() -> UseCasePlugin:
@@ -77,6 +79,7 @@ def sample_chunks() -> list[DocumentChunk]:
 
 
 # ── Plugin Registry tests ─────────────────────────────────────────
+
 
 class TestPluginRegistry:
     def test_register_and_get(self, sample_plugin: UseCasePlugin) -> None:
@@ -144,6 +147,7 @@ class TestPluginRegistry:
 
 # ── RAG Pipeline tests ────────────────────────────────────────────
 
+
 class TestRAGPipeline:
     @pytest.mark.asyncio
     async def test_query_success(
@@ -154,6 +158,7 @@ class TestRAGPipeline:
     ) -> None:
         """Full pipeline happy path with all deps mocked."""
         from app.core.plugin_registry import registry as global_registry
+
         global_registry.register(sample_plugin)
 
         with (
@@ -198,6 +203,7 @@ class TestRAGPipeline:
     ) -> None:
         """Test that when no chunks are found, system returns graceful response."""
         from app.core.plugin_registry import registry as global_registry
+
         global_registry.register(sample_plugin)
 
         with (
@@ -228,6 +234,7 @@ class TestRAGPipeline:
     ) -> None:
         """Test that escalation pattern triggers escalation."""
         from app.core.plugin_registry import registry as global_registry
+
         escalation_plugin = UseCasePlugin(
             id="escalation_test",
             name="Escalation Test",
@@ -286,13 +293,28 @@ class TestRAGPipeline:
         """Test that citations are deduplicated by document ID."""
         pipeline = RAGPipeline()
         chunks = [
-            DocumentChunk(id="c1", document_id="doc1", content="a",
-                          metadata={"filename": "file.pdf"}, score=0.9),
-            DocumentChunk(id="c2", document_id="doc1", content="b",
-                          metadata={"filename": "file.pdf"}, score=0.8),  # same doc
-            DocumentChunk(id="c3", document_id="doc2", content="c",
-                          metadata={"filename": "other.pdf"}, score=0.7),
+            DocumentChunk(
+                id="c1",
+                document_id="doc1",
+                content="a",
+                metadata={"filename": "file.pdf"},
+                score=0.9,
+            ),
+            DocumentChunk(
+                id="c2",
+                document_id="doc1",
+                content="b",
+                metadata={"filename": "file.pdf"},
+                score=0.8,
+            ),  # same doc
+            DocumentChunk(
+                id="c3",
+                document_id="doc2",
+                content="c",
+                metadata={"filename": "other.pdf"},
+                score=0.7,
+            ),
         ]
         citations = pipeline._build_citations(chunks)
-        assert len(citations) == 2   # deduped by document_id
+        assert len(citations) == 2  # deduped by document_id
         assert {c.document_id for c in citations} == {"doc1", "doc2"}

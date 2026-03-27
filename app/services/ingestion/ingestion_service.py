@@ -4,6 +4,7 @@ app/services/ingestion/ingestion_service.py
 Document ingestion pipeline:
 PDF / DOCX / TXT / HTML → clean text → chunks → embeddings → Qdrant
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -24,18 +25,17 @@ from app.services.rag.vector_store import get_vector_store
 
 logger = get_logger(__name__)
 
-
 # ── Content-type validation with magic bytes ──────────────────────
-
 # Mapping: detected MIME → canonical MIME we store
 _ALLOWED_MIME_TYPES: dict[str, str] = {
     "application/pdf": "application/pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ),
     "text/plain": "text/plain",
     "text/html": "text/html",
     "text/markdown": "text/markdown",
-    "text/x-markdown": "text/markdown",   # libmagic sometimes returns this
+    "text/x-markdown": "text/markdown",  # libmagic sometimes returns this
 }
 
 
@@ -47,6 +47,7 @@ def _validate_content_type(content: bytes, claimed_type: str) -> str:
     """
     try:
         import magic  # type: ignore[import]
+
         detected = magic.from_buffer(content[:4096], mime=True)
         canonical = _ALLOWED_MIME_TYPES.get(detected)
         if canonical is None:
@@ -62,14 +63,11 @@ def _validate_content_type(content: bytes, claimed_type: str) -> str:
             note="Install python-magic for proper file validation",
         )
         if claimed_type not in _ALLOWED_MIME_TYPES:
-            raise ValueError(
-                f"Unsupported content type: {claimed_type}"
-            ) from None
+            raise ValueError(f"Unsupported content type: {claimed_type}") from None
         return _ALLOWED_MIME_TYPES[claimed_type]
 
 
 # ── Text extractors ───────────────────────────────────────────────
-
 async def _extract_pdf(content: bytes) -> str:
     import asyncio
 
@@ -110,7 +108,6 @@ EXTRACTORS: dict[str, Any] = {
 
 
 # ── Chunker ───────────────────────────────────────────────────────
-
 def chunk_text(
     text: str,
     chunk_size: int,
@@ -144,9 +141,9 @@ def chunk_text(
 
 
 # ── PII Redactor ──────────────────────────────────────────────────
-
 def redact_pii(text: str, pii_fields: list[str]) -> str:
     import re
+
     if not pii_fields:
         return text
     if "email" in pii_fields:
@@ -159,7 +156,6 @@ def redact_pii(text: str, pii_fields: list[str]) -> str:
 
 
 # ── Main Ingestion Service ────────────────────────────────────────
-
 class IngestionService:
     def __init__(self) -> None:
         self._embedding = get_embedding_service()
@@ -213,6 +209,7 @@ class IngestionService:
             chunk_overlap = chunk_overlap_override or cfg.chunk_overlap
 
             import hashlib as _hashlib
+
             metadata = {
                 "filename": document.filename,
                 "document_id": document.id,

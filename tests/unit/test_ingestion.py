@@ -7,6 +7,7 @@ Unit tests for ingestion service:
 - PII redaction
 - Full ingest flow (mocked Qdrant + embedding)
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
@@ -22,11 +23,17 @@ from app.services.ingestion.ingestion_service import (
 
 # ── Chunking tests ────────────────────────────────────────────────
 
+
 class TestChunking:
     def test_basic_chunking_produces_chunks(self) -> None:
         text = "This is a sentence. " * 100
-        chunks = chunk_text(text, chunk_size=200, chunk_overlap=20,
-                            document_id="doc1", metadata={"filename": "test.txt"})
+        chunks = chunk_text(
+            text,
+            chunk_size=200,
+            chunk_overlap=20,
+            document_id="doc1",
+            metadata={"filename": "test.txt"},
+        )
         assert len(chunks) > 1
         assert all(c.document_id == "doc1" for c in chunks)
         assert all(len(c.content) > 0 for c in chunks)
@@ -56,8 +63,7 @@ class TestChunking:
     def test_chunk_overlap_creates_continuity(self) -> None:
         # With overlap, adjacent chunks should share some content
         text = " ".join([f"word{i}" for i in range(200)])
-        chunks = chunk_text(text, chunk_size=100, chunk_overlap=30,
-                            document_id="d1", metadata={})
+        chunks = chunk_text(text, chunk_size=100, chunk_overlap=30, document_id="d1", metadata={})
         if len(chunks) >= 2:
             # The end of chunk 0 and start of chunk 1 should have overlap
             words_0 = set(chunks[0].content.split())
@@ -73,6 +79,7 @@ class TestChunking:
 
 
 # ── PII Redaction tests ───────────────────────────────────────────
+
 
 class TestPIIRedaction:
     def test_email_redacted(self) -> None:
@@ -113,6 +120,7 @@ class TestPIIRedaction:
 
 
 # ── Ingestion service tests ───────────────────────────────────────
+
 
 class TestIngestionService:
     @pytest.fixture
@@ -201,16 +209,14 @@ class TestIngestionService:
             svc = IngestionService()
             result = await svc.ingest_document(
                 document=document,
-                content=b"   \n\n   ",   # effectively empty after strip
+                content=b"   \n\n   ",  # effectively empty after strip
                 use_case_id="knowledge_base",
             )
         assert result.status == DocumentStatus.FAILED
 
     @pytest.mark.asyncio
     async def test_delete_document_calls_vector_store(self, document: Document) -> None:
-        with patch(
-            "app.services.ingestion.ingestion_service.get_vector_store"
-        ) as mock_vs:
+        with patch("app.services.ingestion.ingestion_service.get_vector_store") as mock_vs:
             mock_vs.return_value.delete_by_document = AsyncMock()
             svc = IngestionService()
             svc._vector_store = mock_vs.return_value

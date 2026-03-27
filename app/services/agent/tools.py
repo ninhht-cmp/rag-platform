@@ -12,6 +12,7 @@ Design principles:
 - Human-in-loop tools require explicit approval flag
 - No tool makes irreversible changes without confirmation
 """
+
 from __future__ import annotations
 
 from langchain_core.tools import tool
@@ -22,6 +23,7 @@ logger = get_logger(__name__)
 
 
 # ── Customer Support Tools ────────────────────────────────────────
+
 
 @tool
 async def create_support_ticket(
@@ -75,15 +77,11 @@ async def check_account_status(user_email: str) -> str:
     """
     logger.info("tool.check_account", email_prefix=user_email[:3] + "***")
     # Stub — replace with real user management API
-    return (
-        "Account status: Active | "
-        "Plan: Pro | "
-        "Next billing: 2026-04-15 | "
-        "Usage this month: 68%"
-    )
+    return "Account status: Active | Plan: Pro | Next billing: 2026-04-15 | Usage this month: 68%"
 
 
 # ── Sales Automation Tools ────────────────────────────────────────
+
 
 @tool
 async def web_search_company(company_name: str) -> str:
@@ -141,7 +139,7 @@ async def draft_outreach_email(
     logger.info("tool.draft_email", company=company_name)
     return (
         f"DRAFT EMAIL — REQUIRES HUMAN REVIEW BEFORE SENDING\n"
-        f"{'='*50}\n"
+        f"{'=' * 50}\n"
         f"To: {prospect_name} @ {company_name}\n"
         f"Subject: Quick question about {pain_point} at {company_name}\n\n"
         f"Hi {prospect_name},\n\n"
@@ -150,7 +148,7 @@ async def draft_outreach_email(
         f"We help with {product_value_prop}.\n\n"
         f"Worth a 15-minute call this week?\n\n"
         f"Best,\n[YOUR NAME]\n\n"
-        f"{'='*50}\n"
+        f"{'=' * 50}\n"
         f"⚠️  Review and personalize before sending."
     )
 

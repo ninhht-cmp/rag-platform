@@ -5,6 +5,7 @@ FastAPI application factory.
 Lifespan: connect infra on startup, graceful shutdown.
 Middleware: CORS, rate limiter, request ID, timing, error handling.
 """
+
 from __future__ import annotations
 
 import time
@@ -99,15 +100,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Validate CORS in production (same fail-fast philosophy as API key validation)
     if settings.is_production and "*" in settings.ALLOWED_HOSTS:
         raise RuntimeError(
-            "ALLOWED_HOSTS=[\"*\"] is not permitted in production. "
+            'ALLOWED_HOSTS=["*"] is not permitted in production. '
             "Set ALLOWED_HOSTS to your actual domain(s)."
         )
 
     # 1. Register plugins
     register_all_plugins()
-    logger.info("app.plugins.loaded", count=len(
-        __import__("app.core.plugin_registry", fromlist=["registry"]).registry
-    ))
+    logger.info(
+        "app.plugins.loaded",
+        count=len(__import__("app.core.plugin_registry", fromlist=["registry"]).registry),
+    )
 
     # 2. Connect Qdrant
     vs = get_vector_store()
@@ -125,11 +127,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # 4. Wire budget guard into LLM service
     from app.services.rag.llm_service import get_llm_service
+
     get_llm_service().set_budget_checker(_budget_checker)
     logger.info("app.budget_guard.wired", limit_usd=settings.LLM_DAILY_BUDGET_USD)
 
     # 5. Wire query audit log into RAG pipeline
     from app.api.v1.endpoints.query import get_pipeline
+
     get_pipeline().set_query_log_callback(_query_log_callback)
     logger.info("app.query_audit.wired")
 

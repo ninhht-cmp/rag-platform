@@ -3,6 +3,7 @@ app/api/v1/endpoints/analytics.py
 ───────────────────────────────────
 Admin analytics endpoints.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -31,6 +32,7 @@ async def get_stats(
     """
     try:
         from app.repositories.document_repository import QueryLogRepository, get_session_factory
+
         async with get_session_factory()() as session:
             repo = QueryLogRepository(session)
             return await repo.get_stats(use_case_id=use_case_id, days=days)
@@ -42,17 +44,19 @@ async def get_stats(
         for p in active_plugins:
             if use_case_id and p.id != use_case_id:
                 continue
-            stats.append({
-                "use_case_id": p.id,
-                "name": p.name,
-                "total_queries": 0,
-                "avg_confidence": 0.0,
-                "avg_latency_ms": 0,
-                "escalated_count": 0,
-                "total_input_tokens": 0,
-                "total_output_tokens": 0,
-                "note": "DB unavailable — showing empty stats",
-            })
+            stats.append(
+                {
+                    "use_case_id": p.id,
+                    "name": p.name,
+                    "total_queries": 0,
+                    "avg_confidence": 0.0,
+                    "avg_latency_ms": 0,
+                    "escalated_count": 0,
+                    "total_input_tokens": 0,
+                    "total_output_tokens": 0,
+                    "note": "DB unavailable — showing empty stats",
+                }
+            )
         return {"period_days": days, "use_cases": stats}
 
 
@@ -70,6 +74,7 @@ async def get_eval_results(
 
     try:
         from app.repositories.document_repository import EvalRepository, get_session_factory
+
         async with get_session_factory()() as session:
             repo = EvalRepository(session)
             return await repo.latest(use_case_id)
@@ -116,6 +121,7 @@ async def trigger_eval(
     # Persist result
     try:
         from app.repositories.document_repository import EvalRepository, get_session_factory
+
         async with get_session_factory()() as session:
             repo = EvalRepository(session)
             await repo.save_result(result)

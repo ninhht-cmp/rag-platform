@@ -11,6 +11,7 @@ Backend priority:
 1. sentence-transformers + torch — free, private, runs locally
 2. OpenAI text-embedding-3-small — fallback when torch unavailable (e.g. Intel Mac)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -50,9 +51,7 @@ class EmbeddingService:
             loop = asyncio.get_running_loop()
 
             # Try sentence-transformers first (local, free, private)
-            st_model = await loop.run_in_executor(
-                None, self._load_sentence_transformer
-            )
+            st_model = await loop.run_in_executor(None, self._load_sentence_transformer)
 
             if st_model is not None:
                 self._model = st_model
@@ -70,6 +69,7 @@ class EmbeddingService:
                     fallback="openai",
                 )
                 from openai import AsyncOpenAI
+
                 self._model = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
                 self._backend = "openai"
                 logger.info("embedding.model.loaded", backend="openai")
@@ -83,6 +83,7 @@ class EmbeddingService:
         """
         try:
             from sentence_transformers import SentenceTransformer  # type: ignore[import]
+
             return SentenceTransformer(
                 settings.EMBEDDING_MODEL,
                 device=settings.EMBEDDING_DEVICE,
@@ -127,7 +128,7 @@ class EmbeddingService:
         all_embeddings: list[list[float]] = []
 
         for i in range(0, len(texts), batch_size):
-            batch = texts[i: i + batch_size]
+            batch = texts[i : i + batch_size]
             embeddings: np.ndarray = await loop.run_in_executor(
                 None,
                 lambda b=batch: model.encode(

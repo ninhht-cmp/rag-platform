@@ -5,6 +5,7 @@ Plugin registry — the extensibility engine.
 Add a new use-case by registering a UseCase plugin.
 Zero infra changes required.
 """
+
 from __future__ import annotations
 
 import re
@@ -30,6 +31,7 @@ class PluginStatus(StrEnum):
 @dataclass
 class RBACRule:
     """Access control: which roles can query which collection."""
+
     allowed_roles: list[str]
     metadata_filters: dict[str, str] = field(default_factory=dict)
 
@@ -59,13 +61,14 @@ class UseCasePlugin:
     Contract every use-case must satisfy.
     Fill this in → platform auto-wires everything.
     """
-    id: str                          # unique slug: "knowledge_base"
-    name: str                        # human label
+
+    id: str  # unique slug: "knowledge_base"
+    name: str  # human label
     description: str
-    collection_name: str             # Qdrant collection — MUST be unique
+    collection_name: str  # Qdrant collection — MUST be unique
     status: PluginStatus
-    intent_patterns: list[str]       # regex patterns for fast routing
-    system_prompt_path: str          # path to Jinja2 template
+    intent_patterns: list[str]  # regex patterns for fast routing
+    system_prompt_path: str  # path to Jinja2 template
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
     rbac: RBACRule = field(default_factory=lambda: RBACRule(allowed_roles=["*"]))
     eval_thresholds: EvalThresholds = field(default_factory=EvalThresholds)

@@ -8,6 +8,7 @@ Limits:
 - Authenticated:  60 req/min  per user
 - Admin:         300 req/min  per user
 """
+
 from __future__ import annotations
 
 import time
@@ -23,9 +24,9 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 _LIMITS: dict[str, tuple[int, int]] = {
-    "admin":  (300, 60),
-    "user":   (60, 60),
-    "anon":   (20, 60),
+    "admin": (300, 60),
+    "user": (60, 60),
+    "anon": (20, 60),
 }
 
 
@@ -40,6 +41,7 @@ def _decode_token_cached(token: str) -> tuple[str, str] | None:
         from jose import jwt
 
         from app.core.config import settings
+
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         user_id = payload.get("sub", "unknown")
         roles = payload.get("roles", [])
@@ -59,6 +61,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             return self._r
         try:
             from app.main import get_redis
+
             return get_redis()
         except Exception as exc:
             raise RuntimeError("Redis not available") from exc

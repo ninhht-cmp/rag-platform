@@ -7,6 +7,7 @@ Qdrant abstraction layer.
 - Hybrid search (semantic + BM25 sparse)
 - Automatic collection creation with correct schema
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -68,7 +69,7 @@ class VectorStore:
                     ef_construct=100,
                     full_scan_threshold=10000,
                 ),
-                on_disk=True,   # memory-efficient for large collections
+                on_disk=True,  # memory-efficient for large collections
             ),
             optimizers_config=qm.OptimizersConfigDiff(
                 indexing_threshold=20000,
@@ -204,8 +205,11 @@ class VectorStore:
                     id=str(r.id),
                     document_id=payload.get("document_id", ""),
                     content=payload.get("content", ""),
-                    metadata={k: v for k, v in payload.items()
-                               if k not in ("content", "document_id", "chunk_index")},
+                    metadata={
+                        k: v
+                        for k, v in payload.items()
+                        if k not in ("content", "document_id", "chunk_index")
+                    },
                     chunk_index=payload.get("chunk_index", 0),
                     score=r.score,
                 )

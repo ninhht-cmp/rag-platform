@@ -5,6 +5,7 @@ End-to-end workflow tests.
 These test complete user journeys from API call to response.
 All LLM/Qdrant calls mocked — focus on data flow correctness.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -35,12 +36,14 @@ def make_token(email: str, roles: list[str]) -> str:
 @pytest.fixture
 def client() -> TestClient:
     from app.main import app
+
     return TestClient(app, raise_server_exceptions=False)
 
 
 # ══════════════════════════════════════════════════════════════════
 # Workflow 1: Login → Upload Doc → Query → Get Answer with Citation
 # ══════════════════════════════════════════════════════════════════
+
 
 class TestKnowledgeBaseWorkflow:
     def test_full_kb_workflow(self, client: TestClient) -> None:
@@ -65,18 +68,18 @@ class TestKnowledgeBaseWorkflow:
             status=DocumentStatus.INDEXED,
             processing_time_ms=320,
         )
-        with patch(
-            "app.api.v1.endpoints.ingestion.get_ingestion_service"
-        ) as mock_svc:
+        with patch("app.api.v1.endpoints.ingestion.get_ingestion_service") as mock_svc:
             mock_svc.return_value.ingest_document = AsyncMock(return_value=mock_ingest)
             upload_resp = client.post(
                 "/api/v1/ingest/upload",
                 data={"use_case_id": "knowledge_base"},
-                files={"file": (
-                    "hr_policy.txt",
-                    b"Vacation policy: 15 days per year.",
-                    "text/plain",
-                )},
+                files={
+                    "file": (
+                        "hr_policy.txt",
+                        b"Vacation policy: 15 days per year.",
+                        "text/plain",
+                    )
+                },
                 headers=headers,
             )
         assert upload_resp.status_code == 202
@@ -86,9 +89,8 @@ class TestKnowledgeBaseWorkflow:
         mock_answer = QueryResponse(
             query="How many vacation days do I get?",
             answer=(
-            "You receive 15 days of annual vacation leave per year."
-            " [Source 1 — hr_policy.txt]"
-        ),
+                "You receive 15 days of annual vacation leave per year. [Source 1 — hr_policy.txt]"
+            ),
             use_case_id="knowledge_base",
             confidence=0.91,
             status=QueryStatus.COMPLETED,
@@ -149,6 +151,7 @@ class TestKnowledgeBaseWorkflow:
 # Workflow 2: Customer Support with Session Memory
 # ══════════════════════════════════════════════════════════════════
 
+
 class TestCustomerSupportWorkflow:
     def test_support_query_with_session(self, client: TestClient) -> None:
         """
@@ -163,9 +166,9 @@ class TestCustomerSupportWorkflow:
         mock_resp = QueryResponse(
             query="How do I reset my password?",
             answer=(
-            "To reset your password: 1. Click 'Forgot Password' on the login page."
-            " 2. Enter your email. 3. Check your inbox for the reset link."
-        ),
+                "To reset your password: 1. Click 'Forgot Password' on the login page."
+                " 2. Enter your email. 3. Check your inbox for the reset link."
+            ),
             use_case_id="customer_support",
             confidence=0.88,
             status=QueryStatus.COMPLETED,
@@ -173,13 +176,16 @@ class TestCustomerSupportWorkflow:
             session_id=session_id,
         )
 
-        with patch(
-            "app.api.v1.endpoints.query.RAGPipeline.query",
-            new_callable=AsyncMock,
-            return_value=mock_resp,
-        ), patch(
-            "app.services.agent.agent_service.AgentService",
-        ) as mock_agent_cls:
+        with (
+            patch(
+                "app.api.v1.endpoints.query.RAGPipeline.query",
+                new_callable=AsyncMock,
+                return_value=mock_resp,
+            ),
+            patch(
+                "app.services.agent.agent_service.AgentService",
+            ) as mock_agent_cls,
+        ):
             mock_agent_cls.return_value.run = AsyncMock(return_value=mock_resp)
             resp = client.post(
                 "/api/v1/query",
@@ -200,6 +206,7 @@ class TestCustomerSupportWorkflow:
 # ══════════════════════════════════════════════════════════════════
 # Workflow 3: RBAC — Sales restricted to sales_rep only
 # ══════════════════════════════════════════════════════════════════
+
 
 class TestRBACWorkflow:
     def test_sales_query_blocked_for_regular_user(self, client: TestClient) -> None:
@@ -252,13 +259,16 @@ class TestRBACWorkflow:
             confidence=0.85,
             status=QueryStatus.COMPLETED,
         )
-        with patch(
-            "app.api.v1.endpoints.query.RAGPipeline.query",
-            new_callable=AsyncMock,
-            return_value=mock_sales,
-        ), patch(
-            "app.services.agent.agent_service.AgentService",
-        ) as mock_agent_cls:
+        with (
+            patch(
+                "app.api.v1.endpoints.query.RAGPipeline.query",
+                new_callable=AsyncMock,
+                return_value=mock_sales,
+            ),
+            patch(
+                "app.services.agent.agent_service.AgentService",
+            ) as mock_agent_cls,
+        ):
             mock_agent_cls.return_value.run = AsyncMock(return_value=mock_sales)
             resp = client.post(
                 "/api/v1/query",
@@ -276,6 +286,7 @@ class TestRBACWorkflow:
 # ══════════════════════════════════════════════════════════════════
 # Workflow 4: Admin — Plugin management and evaluation
 # ══════════════════════════════════════════════════════════════════
+
 
 class TestAdminWorkflow:
     def test_admin_can_list_plugins(self, client: TestClient) -> None:
@@ -297,6 +308,7 @@ class TestAdminWorkflow:
 
     def test_admin_can_trigger_eval(self, client: TestClient) -> None:
         from app.models.domain import EvalMetrics
+
         token = make_token("admin@company.com", ["admin"])
 
         mock_metrics = EvalMetrics(
@@ -307,9 +319,7 @@ class TestAdminWorkflow:
             passed=True,
             sample_size=2,
         )
-        with patch(
-            "app.api.v1.endpoints.analytics.get_eval_service"
-        ) as mock_svc:
+        with patch("app.api.v1.endpoints.analytics.get_eval_service") as mock_svc:
             mock_svc.return_value.evaluate_plugin = AsyncMock(return_value=mock_metrics)
             resp = client.post(
                 "/api/v1/admin/eval/knowledge_base",

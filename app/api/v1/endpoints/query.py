@@ -8,6 +8,7 @@ Query endpoints:
 The pipeline singleton is initialized lazily so set_query_log_callback()
 wired in main.py lifespan is applied before the first request.
 """
+
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
@@ -32,6 +33,7 @@ def get_pipeline() -> RAGPipeline:
     if _pipeline is None:
         try:
             from app.main import get_redis
+
             _pipeline = RAGPipeline(redis_client=get_redis())
         except Exception:
             _pipeline = RAGPipeline()
@@ -51,9 +53,8 @@ async def query(
         plugin = registry.get(request.use_case_id)
     else:
         user_roles = [r.value for r in user.roles]
-        plugin = (
-            registry.route_by_intent(request.query, user_roles)
-            or registry.get("knowledge_base")
+        plugin = registry.route_by_intent(request.query, user_roles) or registry.get(
+            "knowledge_base"
         )
 
     if plugin and plugin.agent_tools:

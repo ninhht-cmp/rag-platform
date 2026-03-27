@@ -8,6 +8,7 @@ FIXES applied:
   K8s probes fire every few seconds; creating an engine each time leaks connections.
   Now uses a module-level reusable engine (lazy-initialized once).
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
@@ -74,6 +75,7 @@ async def readiness() -> HealthStatus:
     # Check Redis
     try:
         from app.main import get_redis
+
         r = get_redis()
         await r.ping()
         components["redis"] = "healthy"

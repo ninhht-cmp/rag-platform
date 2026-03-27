@@ -8,6 +8,7 @@ Usage:
     python scripts/generate_token.py --email admin@company.com --roles admin
     python scripts/generate_token.py --email sales@company.com --roles sales_rep user
 """
+
 import argparse
 import os
 import sys
