@@ -27,8 +27,6 @@ env:
   RAGAS_EVAL_ENABLED: "false"
   LOG_FORMAT: "json"
   LOG_LEVEL: "WARNING"
-  # FIX #4: Hardcode a safe CI-only SECRET_KEY (≥32 chars, not used in any real env).
-  # Never use this value outside CI — it is intentionally public.
   SECRET_KEY: "ci-only-secret-key-not-for-production-use-32x"
   ANTHROPIC_API_KEY: "test_key_not_real"
 
@@ -47,9 +45,6 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
 
-      # FIX #1 + #2: Install the full dep set so mypy can resolve all imports.
-      # Versions are pinned to match pyproject.toml — no more drift between
-      # quality tools and the actual runtime environment.
       - name: Install dependencies
         run: pip install ".[dev]"
 
@@ -59,8 +54,6 @@ jobs:
       - name: Format check (ruff)
         run: ruff format app tests --check
 
-      # FIX #2: mypy now has all stubs available (installed above).
-      # FIX #3: removed continue-on-error — type errors must be fixed, not ignored.
       - name: Type check (mypy)
         run: mypy app --ignore-missing-imports
 
@@ -68,7 +61,6 @@ jobs:
   unit-tests:
     name: Unit tests
     runs-on: ubuntu-latest
-    # No services needed — unit tests mock all infra (Qdrant, Redis, Postgres).
     steps:
       - uses: actions/checkout@v4
         with:
@@ -95,8 +87,6 @@ jobs:
   integration-tests:
     name: Integration + E2E tests
     runs-on: ubuntu-latest
-    # FIX #5: Spin up the real services that the app connects to at startup.
-    # Versions match docker-compose.yml and qdrant-client==1.17.1 in pyproject.toml.
     services:
       qdrant:
         image: qdrant/qdrant:v1.17.0
@@ -159,8 +149,6 @@ jobs:
   docker-build:
     name: Docker build
     runs-on: ubuntu-latest
-    # FIX #6: depend on both test jobs — a passing build image with failing
-    # integration tests is misleading and should not proceed to deploy.
     needs: [unit-tests, integration-tests]
     steps:
       - uses: actions/checkout@v4
@@ -168,6 +156,8 @@ jobs:
           ref: ${{ github.event.inputs.branch || github.ref }}
 
       - uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
 
       - name: Build production image
         uses: docker/build-push-action@v6
@@ -176,7 +166,6 @@ jobs:
           file: docker/Dockerfile
           target: production
           push: false
-          # Layer cache shared across workflow runs via GitHub Actions cache.
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -221,12 +210,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # FIX #7: Replace placeholder echo with a real SSH-based deploy.
-      # Requires these secrets on the staging environment:
-      #   STAGING_SSH_KEY  — private key for the staging server
-      #   STAGING_HOST     — hostname or IP of the staging server
-      #   STAGING_USER     — SSH user (e.g. deploy)
-      #   STAGING_PATH     — absolute path to docker-compose project on server
       - name: Deploy to staging server via SSH
         uses: appleboy/ssh-action@v1.2.2
         with:
