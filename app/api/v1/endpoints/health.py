@@ -11,8 +11,6 @@ FIXES applied:
 
 from __future__ import annotations
 
-from typing import Annotated
-
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
@@ -20,7 +18,7 @@ from app.api.v1.middleware.auth import require_roles
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.plugin_registry import registry
-from app.models.domain import HealthStatus, Role, User
+from app.models.domain import HealthStatus, Role
 from app.services.rag.vector_store import get_vector_store
 
 logger = get_logger(__name__)
